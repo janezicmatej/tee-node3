@@ -1,8 +1,5 @@
 # Flare TEE server node
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/tee-node)](https://goreportcard.com/report/github.com/yourusername/tee-node)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-
 Flare TEE server node is a secure gRPC server implementation running inside a Trusted Execution Environment (TEE). It provides network managed wallets.
 
 ### Features
@@ -23,7 +20,7 @@ Flare TEE server node is a secure gRPC server implementation running inside a Tr
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/505-solutions/tee-node
+git clone https://gitlab.com/flarenetwork/tee/tee-node
 cd tee-node
 ```
 
@@ -104,18 +101,6 @@ gcloud compute instances create <INSTANCE-NAME> \
     --tags=grpc-server \
     --metadata="^~^tee-image-reference=us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest"
 ```
-
-gcloud compute instances create tilen-test-tee1 \  
- --confidential-compute-type=TDX \
- --shielded-secure-boot \
- --scopes=cloud-platform \
- --zone=us-central1-a \
- --maintenance-policy=TERMINATE \
- --image-project=confidential-space-images \
- --image-family=confidential-space-debug-preview-tdx \
- --service-account=confidential-sa@flare-network-sandbox.iam.gserviceaccount.com \
- --tags=grpc-server \
- --metadata="^~^tee-image-reference=us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest"
 
 #### Parameter Explanation
 
