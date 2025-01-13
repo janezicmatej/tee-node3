@@ -1,0 +1,41 @@
+syntax = "proto3";  
+
+package policy.v1;  
+option go_package = "tee-node/gen/go/policy/v1;policyv1"; 
+
+service PolicyService {  
+  rpc InitializePolicy (InitializePolicyRequest) returns (InitializePolicyResponse) {}
+  rpc NewPolicy (SignNewPolicyRequest) returns (SignNewPolicyResponse) {}
+}  
+
+
+message InitializePolicyRequest {
+  bytes initial_policy_bytes = 1;
+  repeated PolicySignaturesArray policy_signatures_array = 2;
+}
+message PolicySignaturesArray {
+  repeated SignNewPolicyRequest policy_signatures = 1;
+}
+
+message SignNewPolicyRequest {
+  bytes policy_bytes = 1;
+  bytes signature = 2;
+  ECDSAPublicKey public_key = 3;
+}
+
+
+// We define multiple response messages for the different RPCs, to comply with the linting rules
+message SignNewPolicyResponse {  
+  bool success = 1;
+  string message = 2;  // Error message or Success message
+}  
+
+message InitializePolicyResponse {  
+  bool success = 1;
+  string message = 2;  // Error message or Success message
+}   
+
+message ECDSAPublicKey {
+  string x = 1;
+  string y = 2;
+}

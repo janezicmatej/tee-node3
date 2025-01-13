@@ -1,0 +1,23 @@
+syntax = "proto3";  
+
+package wallets.v1;  
+option go_package = "tee-node/gen/go/wallets/v1;walletsv1"; 
+
+service WalletsService {  
+  rpc NewWallet (WalletRequest) returns (NewWalletResponse) {}
+  rpc PublicKey (WalletRequest) returns (PublicKeyResponse) {}
+}  
+
+message WalletRequest {  
+  string name = 1; 
+}
+
+message NewWalletResponse { 
+  bool success = 1;
+  string message = 2;  // Error message or Success message
+}
+
+message PublicKeyResponse { 
+  bool success = 1;
+  string address = 2;
+}
