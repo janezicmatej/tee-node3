@@ -17,7 +17,7 @@ type Wallet struct {
 	Address    common.Address
 }
 
-var Wallets map[string]Wallet = make(map[string]Wallet)
+var wallets map[string]Wallet = make(map[string]Wallet)
 
 func CreateNewWallet(name string) (string, error) {
 	skBytes := make([]byte, 32)
@@ -32,14 +32,14 @@ func CreateNewWallet(name string) (string, error) {
 	}
 
 	newWallet := Wallet{PrivateKey: sk, PublicKey: &sk.PublicKey, Address: crypto.PubkeyToAddress(sk.PublicKey)}
-	Wallets[name] = newWallet
+	wallets[name] = newWallet
 
 	return newWallet.Address.Hex(), nil
 }
 
 // todo: add attestation
 func GetPublicKey(name string) (string, error) {
-	wallet, ok := Wallets[name]
+	wallet, ok := wallets[name]
 	if !ok {
 		return "", errors.New("wallet non-existent")
 	}
