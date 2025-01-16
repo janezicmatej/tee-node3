@@ -2,6 +2,7 @@ package policy
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,4 +25,5 @@ func TestFetchPolicyHistory(t *testing.T) {
 	require.NoError(t, err)
 	_ = policies
 	_ = signatures
+	fmt.Println(len(policies), len(signatures), maxInt)
 }

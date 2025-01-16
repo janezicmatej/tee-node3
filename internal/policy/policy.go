@@ -19,6 +19,11 @@ var ActiveSigningPolicy SigningPolicy
 var ActiveSigningPolicyHash []byte
 var SigningPolicies map[uint32]SigningPolicy = make(map[uint32]SigningPolicy)
 
+type Signature struct {
+	Sig    []byte
+	PubKey []byte
+}
+
 type SigningPolicyPrefix struct {
 	NumVoters          uint16
 	RewardEpochId      uint32

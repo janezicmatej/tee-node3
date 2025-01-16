@@ -3,9 +3,12 @@ package policy
 import (
 	"context"
 	"encoding/hex"
+	"tee-node/internal/policy"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/contracts/relay"
 	"github.com/flare-foundation/go-flare-common/pkg/contracts/system"
 	"github.com/flare-foundation/go-flare-common/pkg/database"
@@ -19,13 +22,18 @@ type PolicyHistoryParams struct {
 	FlareSystemManagerContractAddress common.Address
 }
 
-const signNewSigningPolicy = "signNewSigningPolicy"
+const (
+	signNewSigningPolicy = "signNewSigningPolicy"
+	maxInt               = int64(^uint64(0) >> 1)
+)
 
-var signingPolicyInitializedEventSel common.Hash
-var AttestationRequestEventSel common.Hash
-var systemABI *abi.ABI
-var signNewSigningPolicyAbiArgs abi.Arguments
-var signNewSigningPolicyFuncSel [4]byte
+var (
+	signingPolicyInitializedEventSel common.Hash
+	AttestationRequestEventSel       common.Hash
+	systemABI                        *abi.ABI
+	signNewSigningPolicyAbiArgs      abi.Arguments
+	signNewSigningPolicyFuncSel      [4]byte
+)
 
 func init() {
 	relayABI, err := relay.RelayMetaData.GetAbi()
@@ -49,12 +57,12 @@ func init() {
 }
 
 // FetchPolicyHistory extracts all the data involving policies from the database
-func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB) ([]*relay.RelaySigningPolicyInitialized, map[string][]*system.IFlareSystemsManagerSignature, error) {
+func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB) ([]*relay.RelaySigningPolicyInitialized, map[string][]*policy.Signature, error) {
 	logsParams := database.LogsParams{
 		Address: params.RelayContractAddress,
 		Topic0:  signingPolicyInitializedEventSel,
 		From:    0,
-		To:      100000000000000, // todo max
+		To:      maxInt,
 	}
 
 	logs, err := database.FetchLogsByAddressAndTopic0Timestamp(
@@ -68,7 +76,7 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 		ToAddress:   params.FlareSystemManagerContractAddress,
 		FunctionSel: signNewSigningPolicyFuncSel,
 		From:        0,
-		To:          100000000000000, // todo max
+		To:          maxInt,
 	}
 	txs, err := database.FetchTransactionsByAddressAndSelectorTimestamp(
 		ctx, db, txsParams,
@@ -77,7 +85,7 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 		return nil, nil, err
 	}
 
-	hashToSignatures := make(map[string][]*system.IFlareSystemsManagerSignature)
+	hashToSignatures := make(map[string][]*policy.Signature)
 	for _, tx := range txs {
 		inputBytes, err := hex.DecodeString(tx.Input)
 		if err != nil {
@@ -92,15 +100,22 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 		// rewardEpochId := *abi.ConvertType(signNewSigningPolicyInputBytesArray[0], new(*big.Int)).(**big.Int)
 		newSigningPolicyHashBytes := *abi.ConvertType(signNewSigningPolicyInputBytesArray[1], new([32]byte)).(*[32]byte)
 		newSigningPolicyHash := hex.EncodeToString(newSigningPolicyHashBytes[:])
-		signature := *abi.ConvertType(signNewSigningPolicyInputBytesArray[2], new(system.IFlareSystemsManagerSignature)).(*system.IFlareSystemsManagerSignature)
+		systemManageSignature := *abi.ConvertType(signNewSigningPolicyInputBytesArray[2], new(system.IFlareSystemsManagerSignature)).(*system.IFlareSystemsManagerSignature)
+
+		sigBytes := make([]byte, 65)
+		copy(sigBytes[0:32], systemManageSignature.R[:])
+		copy(sigBytes[32:64], systemManageSignature.S[:])
+		sigBytes[64] = systemManageSignature.V - 27
+		pubKeyBytes, err := crypto.Ecrecover(accounts.TextHash(newSigningPolicyHashBytes[:]), sigBytes)
+		if err != nil {
+			return nil, nil, err
+		}
+		sig := policy.Signature{Sig: sigBytes, PubKey: pubKeyBytes}
 
 		if _, ok := hashToSignatures[newSigningPolicyHash]; !ok {
-			hashToSignatures[newSigningPolicyHash] = make([]*system.IFlareSystemsManagerSignature, 0)
+			hashToSignatures[newSigningPolicyHash] = make([]*policy.Signature, 0)
 		}
-
-		hashToSignatures[newSigningPolicyHash] = append(hashToSignatures[newSigningPolicyHash], &signature)
-
-		// fmt.Println(rewardEpochId, newSigningPolicyHash, signature)
+		hashToSignatures[newSigningPolicyHash] = append(hashToSignatures[newSigningPolicyHash], &sig)
 	}
 
 	policies := make([]*relay.RelaySigningPolicyInitialized, len(logs))
