@@ -4,11 +4,14 @@ package wallets.v1;
 option go_package = "tee-node/gen/go/wallets/v1;walletsv1"; 
 
 service WalletsService {  
-  rpc NewWallet (WalletRequest) returns (NewWalletResponse) {}
-  rpc PublicKey (WalletRequest) returns (PublicKeyResponse) {}
+  rpc NewWallet (NewWalletRequest) returns (NewWalletResponse) {}
+  rpc PublicKey (PublicKeyRequest) returns (PublicKeyResponse) {}
 }  
 
-message WalletRequest {  
+message NewWalletRequest {  
+  string name = 1; 
+}
+message PublicKeyRequest {  
   string name = 1; 
 }
 

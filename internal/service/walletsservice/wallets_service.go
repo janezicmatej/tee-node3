@@ -19,7 +19,7 @@ func NewService() *Service {
 }
 
 // todo: add attestation
-func (s *Service) NewWallet(ctx context.Context, req *pb.WalletRequest) (*pb.NewWalletResponse, error) {
+func (s *Service) NewWallet(ctx context.Context, req *pb.NewWalletRequest) (*pb.NewWalletResponse, error) {
 	_, err := wallets.CreateNewWallet(req.Name)
 	if err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func (s *Service) NewWallet(ctx context.Context, req *pb.WalletRequest) (*pb.New
 	}, nil
 }
 
-func (s *Service) PublicKey(ctx context.Context, req *pb.WalletRequest) (*pb.PublicKeyResponse, error) {
+func (s *Service) PublicKey(ctx context.Context, req *pb.PublicKeyRequest) (*pb.PublicKeyResponse, error) {
 	address, err := wallets.GetPublicKey(req.Name)
 	if err != nil {
 		return nil, err

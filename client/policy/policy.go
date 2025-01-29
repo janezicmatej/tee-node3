@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"tee-node/internal/policy"
 
+	pb "tee-node/gen/go/policy/v1"
+	pd "tee-node/internal/policy"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -127,4 +130,58 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 	}
 
 	return policies, hashToSignatures, nil
+}
+
+func CreateSigningRequest(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB) (*pb.InitializePolicyRequest, error) {
+	policies, signatures, err := FetchPolicyHistory(ctx, params, db)
+	if err != nil {
+		return nil, err
+	}
+
+	policyRequests := []*pb.SignNewPolicyRequest{}
+
+	// Replay policy signing from the second policy onwards
+	for _, policy := range policies[1:] {
+		policyHash := hex.EncodeToString(pd.SigningPolicyHash(policy.SigningPolicyBytes))
+		policySignatures := signatures[policyHash]
+		policyDecoded, err := pd.DecodeSigningPolicy(policy.SigningPolicyBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		policySignatureRequests := []*pb.PolicySignatureMessage{}
+		for _, sig := range policySignatures {
+			pubKey, err := crypto.UnmarshalPubkey(sig.PubKey)
+			if err != nil {
+				return nil, err
+			}
+
+			weight := pd.GetSignerWeight(pubKey, policyDecoded)
+			if weight == 0 {
+				continue
+			}
+
+			mes := pb.PolicySignatureMessage{
+				PublicKey: &pb.ECDSAPublicKey{
+					X: pubKey.X.String(),
+					Y: pubKey.Y.String(),
+				},
+				Signature: sig.Sig,
+			}
+			policySignatureRequests = append(policySignatureRequests, &mes)
+		}
+
+		signNewPolicyRequest := pb.SignNewPolicyRequest{
+			PolicyBytes:             policy.SigningPolicyBytes,
+			PolicySignatureMessages: policySignatureRequests,
+		}
+
+		policyRequests = append(policyRequests, &signNewPolicyRequest)
+	}
+	req := &pb.InitializePolicyRequest{
+		InitialPolicyBytes: policies[0].SigningPolicyBytes,
+		NewPolicyRequests:  policyRequests,
+	}
+
+	return req, nil
 }

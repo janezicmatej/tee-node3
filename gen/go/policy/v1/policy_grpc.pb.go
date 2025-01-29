@@ -20,15 +20,19 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	PolicyService_InitializePolicy_FullMethodName = "/policy.v1.PolicyService/InitializePolicy"
-	PolicyService_NewPolicy_FullMethodName        = "/policy.v1.PolicyService/NewPolicy"
+	PolicyService_SignNewPolicy_FullMethodName    = "/policy.v1.PolicyService/SignNewPolicy"
+	PolicyService_GetActivePolicy_FullMethodName  = "/policy.v1.PolicyService/GetActivePolicy"
 )
 
 // PolicyServiceClient is the client API for PolicyService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PolicyServiceClient interface {
+	// This replays all the policies and signatures from the first policy to the current active policy
 	InitializePolicy(ctx context.Context, in *InitializePolicyRequest, opts ...grpc.CallOption) (*InitializePolicyResponse, error)
-	NewPolicy(ctx context.Context, in *SignNewPolicyRequest, opts ...grpc.CallOption) (*SignNewPolicyResponse, error)
+	// This is used to sign a new policy by a single data provider(validator)
+	SignNewPolicy(ctx context.Context, in *SignNewPolicyRequest, opts ...grpc.CallOption) (*SignNewPolicyResponse, error)
+	GetActivePolicy(ctx context.Context, in *GetActivePolicyRequest, opts ...grpc.CallOption) (*GetActivePolicyResponse, error)
 }
 
 type policyServiceClient struct {
@@ -49,10 +53,20 @@ func (c *policyServiceClient) InitializePolicy(ctx context.Context, in *Initiali
 	return out, nil
 }
 
-func (c *policyServiceClient) NewPolicy(ctx context.Context, in *SignNewPolicyRequest, opts ...grpc.CallOption) (*SignNewPolicyResponse, error) {
+func (c *policyServiceClient) SignNewPolicy(ctx context.Context, in *SignNewPolicyRequest, opts ...grpc.CallOption) (*SignNewPolicyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SignNewPolicyResponse)
-	err := c.cc.Invoke(ctx, PolicyService_NewPolicy_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, PolicyService_SignNewPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *policyServiceClient) GetActivePolicy(ctx context.Context, in *GetActivePolicyRequest, opts ...grpc.CallOption) (*GetActivePolicyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetActivePolicyResponse)
+	err := c.cc.Invoke(ctx, PolicyService_GetActivePolicy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +77,11 @@ func (c *policyServiceClient) NewPolicy(ctx context.Context, in *SignNewPolicyRe
 // All implementations must embed UnimplementedPolicyServiceServer
 // for forward compatibility.
 type PolicyServiceServer interface {
+	// This replays all the policies and signatures from the first policy to the current active policy
 	InitializePolicy(context.Context, *InitializePolicyRequest) (*InitializePolicyResponse, error)
-	NewPolicy(context.Context, *SignNewPolicyRequest) (*SignNewPolicyResponse, error)
+	// This is used to sign a new policy by a single data provider(validator)
+	SignNewPolicy(context.Context, *SignNewPolicyRequest) (*SignNewPolicyResponse, error)
+	GetActivePolicy(context.Context, *GetActivePolicyRequest) (*GetActivePolicyResponse, error)
 	mustEmbedUnimplementedPolicyServiceServer()
 }
 
@@ -78,8 +95,11 @@ type UnimplementedPolicyServiceServer struct{}
 func (UnimplementedPolicyServiceServer) InitializePolicy(context.Context, *InitializePolicyRequest) (*InitializePolicyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitializePolicy not implemented")
 }
-func (UnimplementedPolicyServiceServer) NewPolicy(context.Context, *SignNewPolicyRequest) (*SignNewPolicyResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NewPolicy not implemented")
+func (UnimplementedPolicyServiceServer) SignNewPolicy(context.Context, *SignNewPolicyRequest) (*SignNewPolicyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SignNewPolicy not implemented")
+}
+func (UnimplementedPolicyServiceServer) GetActivePolicy(context.Context, *GetActivePolicyRequest) (*GetActivePolicyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetActivePolicy not implemented")
 }
 func (UnimplementedPolicyServiceServer) mustEmbedUnimplementedPolicyServiceServer() {}
 func (UnimplementedPolicyServiceServer) testEmbeddedByValue()                       {}
@@ -120,20 +140,38 @@ func _PolicyService_InitializePolicy_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PolicyService_NewPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _PolicyService_SignNewPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SignNewPolicyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PolicyServiceServer).NewPolicy(ctx, in)
+		return srv.(PolicyServiceServer).SignNewPolicy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PolicyService_NewPolicy_FullMethodName,
+		FullMethod: PolicyService_SignNewPolicy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PolicyServiceServer).NewPolicy(ctx, req.(*SignNewPolicyRequest))
+		return srv.(PolicyServiceServer).SignNewPolicy(ctx, req.(*SignNewPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PolicyService_GetActivePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetActivePolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PolicyServiceServer).GetActivePolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PolicyService_GetActivePolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PolicyServiceServer).GetActivePolicy(ctx, req.(*GetActivePolicyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -150,8 +188,12 @@ var PolicyService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _PolicyService_InitializePolicy_Handler,
 		},
 		{
-			MethodName: "NewPolicy",
-			Handler:    _PolicyService_NewPolicy_Handler,
+			MethodName: "SignNewPolicy",
+			Handler:    _PolicyService_SignNewPolicy_Handler,
+		},
+		{
+			MethodName: "GetActivePolicy",
+			Handler:    _PolicyService_GetActivePolicy_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

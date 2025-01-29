@@ -12,6 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+type SigningPolicyPrefix struct {
+	NumVoters          uint16
+	RewardEpochId      uint32
+	StartVotingRoundId uint32
+	Threshold          uint16
+	Seed               *big.Int
+}
+
 func EncodeSigningPolicy(policy *SigningPolicy) ([]byte, error) {
 	// Validation
 	if policy == nil {
@@ -84,7 +92,6 @@ func EncodeToHex(bytes []byte) string {
 
 	return "0x" + hex.EncodeToString(bytes)
 }
-
 
 func decodeSigningPolicyPrefix(data []byte) (*SigningPolicyPrefix, error) {
 	if len(data) < 64 {

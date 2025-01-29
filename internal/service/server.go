@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection" // Helpful for debugging
 
-	pb "tee-node/gen/go/signing/v1"
+	pb "tee-node/gen/go/policy/v1"
 	walletsv1 "tee-node/gen/go/wallets/v1"
 	"tee-node/internal/service/attestationservice"
 	"tee-node/internal/service/policyservice"
@@ -54,7 +54,7 @@ func LaunchServer(port int) {
 	walletsService := walletsservice.NewService()
 
 	// Register services
-	pb.RegisterSigningServiceServer(grpcServer, signingService)
+	pb.RegisterPolicyServiceServer(grpcServer, signingService)
 	at.RegisterAttestationServiceServer(grpcServer, attestationService)
 	walletsv1.RegisterWalletsServiceServer(grpcServer, walletsService)
 
