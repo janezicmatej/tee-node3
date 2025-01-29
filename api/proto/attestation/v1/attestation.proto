@@ -20,11 +20,9 @@ message GetHardwareAttestationRequest {
 
 // We define multiple response messages for the different RPCs, to comply with the linting rules
 message GetAttestationTokenResponse {
-  bool success = 1;
-  string jwt_bytes = 2;
+  string jwt_bytes = 1;
 }
 
 message GetHardwareAttestationResponse {
-  bool success = 1;
-  string json_attestation = 2;
+  string json_attestation = 1;
 }

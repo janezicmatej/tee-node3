@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math/rand"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -42,6 +43,11 @@ func GenerateEthereumPublicKey(privateKey *ecdsa.PrivateKey) *ecdsa.PublicKey {
 // PubkeyToAddress converts an Ethereum public key to an Ethereum address
 func PubkeyToAddress(pubkey *ecdsa.PublicKey) common.Address {
 	return crypto.PubkeyToAddress(*pubkey)
+}
+
+// VerifySignature verifies a signature against a message hash
+func VerifySignature(pubKey *ecdsa.PublicKey, msgHash []byte, signature []byte) bool {
+	return crypto.VerifySignature(crypto.CompressPubkey(pubKey), accounts.TextHash(msgHash), signature[:len(signature)-1])
 }
 
 func RandomNormalizedArray(n int, seed int64) []float64 {

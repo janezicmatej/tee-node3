@@ -31,12 +31,12 @@ func main() {
 	walletClient := walletsv1.NewWalletsServiceClient(clientConn)
 
 	walletName := "test_wallet"
-	_, err = walletClient.NewWallet(ctx, &walletsv1.WalletRequest{Name: walletName})
+	_, err = walletClient.NewWallet(ctx, &walletsv1.NewWalletRequest{Name: walletName})
 	if err != nil {
 		log.Fatalf("could not create a new wallet: %v", err)
 	}
 
-	pubKeyResp, err := walletClient.PublicKey(ctx, &walletsv1.WalletRequest{Name: walletName})
+	pubKeyResp, err := walletClient.PublicKey(ctx, &walletsv1.PublicKeyRequest{Name: walletName})
 	if err != nil {
 		log.Fatalf("could not create a new wallet: %v", err)
 	}

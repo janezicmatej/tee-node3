@@ -40,7 +40,6 @@ func (s *Service) GetAttestationToken(ctx context.Context, req *pb.GetAttestatio
 	}
 
 	return &pb.GetAttestationTokenResponse{
-		Success:  true,
 		JwtBytes: string(tokenbytes),
 	}, nil
 }
@@ -69,7 +68,6 @@ func (s *Service) GetHardwareAttestation(ctx context.Context, req *pb.GetHardwar
 	}
 
 	return &pb.GetHardwareAttestationResponse{
-		Success:         true,
 		JsonAttestation: json_attestation,
 	}, nil
 }

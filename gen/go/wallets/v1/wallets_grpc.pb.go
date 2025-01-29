@@ -27,8 +27,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WalletsServiceClient interface {
-	NewWallet(ctx context.Context, in *WalletRequest, opts ...grpc.CallOption) (*NewWalletResponse, error)
-	PublicKey(ctx context.Context, in *WalletRequest, opts ...grpc.CallOption) (*PublicKeyResponse, error)
+	NewWallet(ctx context.Context, in *NewWalletRequest, opts ...grpc.CallOption) (*NewWalletResponse, error)
+	PublicKey(ctx context.Context, in *PublicKeyRequest, opts ...grpc.CallOption) (*PublicKeyResponse, error)
 }
 
 type walletsServiceClient struct {
@@ -39,7 +39,7 @@ func NewWalletsServiceClient(cc grpc.ClientConnInterface) WalletsServiceClient {
 	return &walletsServiceClient{cc}
 }
 
-func (c *walletsServiceClient) NewWallet(ctx context.Context, in *WalletRequest, opts ...grpc.CallOption) (*NewWalletResponse, error) {
+func (c *walletsServiceClient) NewWallet(ctx context.Context, in *NewWalletRequest, opts ...grpc.CallOption) (*NewWalletResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(NewWalletResponse)
 	err := c.cc.Invoke(ctx, WalletsService_NewWallet_FullMethodName, in, out, cOpts...)
@@ -49,7 +49,7 @@ func (c *walletsServiceClient) NewWallet(ctx context.Context, in *WalletRequest,
 	return out, nil
 }
 
-func (c *walletsServiceClient) PublicKey(ctx context.Context, in *WalletRequest, opts ...grpc.CallOption) (*PublicKeyResponse, error) {
+func (c *walletsServiceClient) PublicKey(ctx context.Context, in *PublicKeyRequest, opts ...grpc.CallOption) (*PublicKeyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PublicKeyResponse)
 	err := c.cc.Invoke(ctx, WalletsService_PublicKey_FullMethodName, in, out, cOpts...)
@@ -63,8 +63,8 @@ func (c *walletsServiceClient) PublicKey(ctx context.Context, in *WalletRequest,
 // All implementations must embed UnimplementedWalletsServiceServer
 // for forward compatibility.
 type WalletsServiceServer interface {
-	NewWallet(context.Context, *WalletRequest) (*NewWalletResponse, error)
-	PublicKey(context.Context, *WalletRequest) (*PublicKeyResponse, error)
+	NewWallet(context.Context, *NewWalletRequest) (*NewWalletResponse, error)
+	PublicKey(context.Context, *PublicKeyRequest) (*PublicKeyResponse, error)
 	mustEmbedUnimplementedWalletsServiceServer()
 }
 
@@ -75,10 +75,10 @@ type WalletsServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedWalletsServiceServer struct{}
 
-func (UnimplementedWalletsServiceServer) NewWallet(context.Context, *WalletRequest) (*NewWalletResponse, error) {
+func (UnimplementedWalletsServiceServer) NewWallet(context.Context, *NewWalletRequest) (*NewWalletResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewWallet not implemented")
 }
-func (UnimplementedWalletsServiceServer) PublicKey(context.Context, *WalletRequest) (*PublicKeyResponse, error) {
+func (UnimplementedWalletsServiceServer) PublicKey(context.Context, *PublicKeyRequest) (*PublicKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublicKey not implemented")
 }
 func (UnimplementedWalletsServiceServer) mustEmbedUnimplementedWalletsServiceServer() {}
@@ -103,7 +103,7 @@ func RegisterWalletsServiceServer(s grpc.ServiceRegistrar, srv WalletsServiceSer
 }
 
 func _WalletsService_NewWallet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WalletRequest)
+	in := new(NewWalletRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -115,13 +115,13 @@ func _WalletsService_NewWallet_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: WalletsService_NewWallet_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WalletsServiceServer).NewWallet(ctx, req.(*WalletRequest))
+		return srv.(WalletsServiceServer).NewWallet(ctx, req.(*NewWalletRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _WalletsService_PublicKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WalletRequest)
+	in := new(PublicKeyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func _WalletsService_PublicKey_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: WalletsService_PublicKey_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WalletsServiceServer).PublicKey(ctx, req.(*WalletRequest))
+		return srv.(WalletsServiceServer).PublicKey(ctx, req.(*PublicKeyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

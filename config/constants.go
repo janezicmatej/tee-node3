@@ -1,3 +1,3 @@
 package config
 
-const InitialPolicyHash = ""
+var InitialPolicyHash = "" // Todo: Const? but then test fail

@@ -239,3 +239,10 @@ go run cmd/client/main.go cmd/client/utils.go
 
 -   Implement hardware attestation API
 -   Understand What the attestation is attesting? :) -->
+
+### Run tests
+
+Run all tests with
+```
+go test ./...
+```

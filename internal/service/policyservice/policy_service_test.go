@@ -3,56 +3,60 @@ package policyservice
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
-	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"tee-node/config"
 	"tee-node/internal/policy"
-	"tee-node/internal/utils"
 
-	"math/rand"
-	pb "tee-node/gen/go/signing/v1"
+	testutils "tee-node/tests"
+
+	pb "tee-node/gen/go/policy/v1"
 )
 
 func TestInitializePolicy(t *testing.T) {
+	defer testutils.ResetSigningServiceState() // Reset the state of the TEE after the test
+
 	// Generate random voters and corresponding private keys
-	voters, privKeys := generateRandomVoters()
+	voters, privKeys := testutils.GenerateRandomVoters(t)
 
 	// Generate a random initial policy
 	randSeed := int64(12345)
 	epochId := uint32(1)
-	initialPolicy := generateRandomPolicyData(epochId, voters, randSeed)
+	initialPolicy := testutils.GenerateRandomPolicyData(t, epochId, voters, randSeed)
 
 	initialPolicyBytes, err := policy.EncodeSigningPolicy(&initialPolicy)
 	if err != nil {
 		t.Errorf("Failed to encode the policy")
 	}
 
+	// Set the initial policy hash in the config
+	setInitialPolicyHash(initialPolicyBytes)
+
 	// Generate a few more policies and their signatures
-	policySignaturesArray := []*pb.PolicySignaturesArray{}
+	policySignaturesArray := []*pb.SignNewPolicyRequest{}
 
 	numPolicies := 5 // Number of policies to generate
 	for i := 0; i < numPolicies; i++ {
-
 		epochId++
 		randSeed++
-		nextPolicy := generateRandomPolicyData(epochId, voters, randSeed)
+		nextPolicy := testutils.GenerateRandomPolicyData(t, epochId, voters, randSeed)
 
 		nextPolicyBytes, err := policy.EncodeSigningPolicy(&nextPolicy)
 		if err != nil {
 			t.Errorf("Failed to encode the policy")
 		}
 
-		policySignatures := buildPolicySignature(epochId, nextPolicyBytes, privKeys)
+		policySignatures := testutils.BuildPolicySignature(t, nextPolicyBytes, privKeys)
 		policySignaturesArray = append(policySignaturesArray, policySignatures)
 
 	}
 
 	req := pb.InitializePolicyRequest{
-		InitialPolicyBytes:    initialPolicyBytes,
-		PolicySignaturesArray: policySignaturesArray,
+		InitialPolicyBytes: initialPolicyBytes,
+		NewPolicyRequests:  policySignaturesArray,
 	}
 
 	signingService := NewService()
@@ -62,61 +66,69 @@ func TestInitializePolicy(t *testing.T) {
 		t.Errorf("Failed to initialize the policy: %v", err)
 	}
 
-	fmt.Printf("Response: %v\n", response)
+	t.Logf("Response: %v\n", response)
 }
 
 func TestSignNewPolicy(t *testing.T) {
+	defer testutils.ResetSigningServiceState() // Reset the state of the TEE after the test
+
 	// Generate random voters and corresponding private keys
-	voters, voterPrivKeys := generateRandomVoters()
+	voters, voterPrivKeys := testutils.GenerateRandomVoters(t)
 
 	// Generate a random initial policy
 	randSeed := int64(12345)
 	epochId := uint32(1)
-	initialPolicy := generateRandomPolicyData(epochId, voters, randSeed)
+	initialPolicy := testutils.GenerateRandomPolicyData(t, epochId, voters, randSeed)
 
 	initialPolicyBytes, err := policy.EncodeSigningPolicy(&initialPolicy)
 	if err != nil {
 		t.Errorf("Failed to encode the policy")
 	}
 
+	// Set the initial policy hash in the config
+	setInitialPolicyHash(initialPolicyBytes)
+
 	// Generate a few more policies and their signatures
-	policySignaturesArray := []*pb.PolicySignaturesArray{}
+	policySignaturesArray := []*pb.SignNewPolicyRequest{}
 
 	req := pb.InitializePolicyRequest{
-		InitialPolicyBytes:    initialPolicyBytes,
-		PolicySignaturesArray: policySignaturesArray,
+		InitialPolicyBytes: initialPolicyBytes,
+		NewPolicyRequests:  policySignaturesArray,
 	}
 
 	signingService := NewService()
 
-	response, err := signingService.InitializePolicy(context.Background(), &req)
+	_, err = signingService.InitializePolicy(context.Background(), &req)
 	if err != nil {
 		t.Errorf("Failed to initialize the policy: %v", err)
 	}
 
-	fmt.Printf("Response: %v\n", response)
-
 	// Generate a new policy and sign it
 	epochId++
 	randSeed++
-	nextPolicy := generateRandomPolicyData(epochId, voters, randSeed)
+	nextPolicy := testutils.GenerateRandomPolicyData(t, epochId, voters, randSeed)
 
 	nextPolicyBytes, err := policy.EncodeSigningPolicy(&nextPolicy)
 	if err != nil {
 		t.Errorf("Failed to encode the policy")
 	}
 
-	newPolicySigRequests := []*pb.SignNewPolicyRequest{}
-	for i := 0; i < 60; i++ {
+	// * ----------------------------------------------------------------
+
+	// Calculate the index of the voter at which the accumulaterd voterWeight passes the threshold
+	thrIndex := getTresholdRechedVoterIndex(&nextPolicy, voterPrivKeys)
+
+	// ! First batch of signatures //
+	newPolicySigRequests := []*pb.PolicySignatureMessage{}
+	for i := 0; i < thrIndex; i++ {
 
 		sig, err := policy.SignNewSigningPolicy(policy.SigningPolicyHash(nextPolicyBytes), voterPrivKeys[i])
 		if err != nil {
 			panic(err)
 		}
 
-		req := pb.SignNewPolicyRequest{
-			PolicyBytes: nextPolicyBytes,
-			PublicKey: &pb.ECDSAPulicKey{
+		req := pb.PolicySignatureMessage{
+			PublicKey: &pb.ECDSAPublicKey{
 				X: voterPrivKeys[i].PublicKey.X.String(),
 				Y: voterPrivKeys[i].PublicKey.Y.String(),
 			},
@@ -125,115 +137,241 @@ func TestSignNewPolicy(t *testing.T) {
 
 		newPolicySigRequests = append(newPolicySigRequests, &req)
 
-		res2, err := signingService.SignNewPolicy(context.Background(), newPolicySigRequests[0])
-		if err != nil {
-			t.Errorf("Failed to initialize the policy: %v", err)
-		}
-
-		fmt.Printf("Response2: %v\n", res2)
-
 	}
 
-}
+	signNewPolicyReq := pb.SignNewPolicyRequest{
+		PolicyBytes:             nextPolicyBytes,
+		PolicySignatureMessages: newPolicySigRequests,
+	}
 
-// * UTILS ========================================== * //
-// * ================================================ * //
+	res2, err := signingService.SignNewPolicy(context.Background(), &signNewPolicyReq)
+	if err != nil {
+		t.Errorf("Failed to send new Policy signatures 1: %v", err)
+	}
 
-func buildPolicySignature(rewardEpochId uint32, policyBytes []byte, voterPrivKeys []*ecdsa.PrivateKey) *pb.PolicySignaturesArray {
+	// ! Second batch of signatures //
+	newPolicySigRequests = []*pb.PolicySignatureMessage{}
+	for i := thrIndex; i < len(voterPrivKeys); i++ {
 
-	PolicySignatures := []*pb.SignNewPolicyRequest{}
-
-	for i, voterPrivKey := range voterPrivKeys {
-
-		voterPubKey := voterPrivKey.PublicKey
-
-		sig, err := policy.SignNewSigningPolicy(policy.SigningPolicyHash(policyBytes), voterPrivKeys[i])
+		sig, err := policy.SignNewSigningPolicy(policy.SigningPolicyHash(nextPolicyBytes), voterPrivKeys[i])
 		if err != nil {
 			panic(err)
 		}
 
-		PolicySignatures = append(PolicySignatures, &pb.SignNewPolicyRequest{
-			PolicyBytes: policyBytes,
-			PublicKey: &pb.ECDSAPulicKey{
-				X: voterPubKey.X.String(),
-				Y: voterPubKey.Y.String(),
+		req := pb.PolicySignatureMessage{
+			PublicKey: &pb.ECDSAPublicKey{
+				X: voterPrivKeys[i].PublicKey.X.String(),
+				Y: voterPrivKeys[i].PublicKey.Y.String(),
 			},
 			Signature: sig,
-		})
-
-	}
-
-	return &pb.PolicySignaturesArray{
-		PolicySignatures: PolicySignatures,
-	}
-}
-
-// Always returns the same voters and private keys
-const NUM_VOTERS = 100
-
-func generateRandomVoters() ([]common.Address, []*ecdsa.PrivateKey) {
-
-	Voters := make([]common.Address, NUM_VOTERS)
-	privKeys := make([]*ecdsa.PrivateKey, NUM_VOTERS)
-
-	for i := 0; i < NUM_VOTERS; i++ {
-		voterPrivKey, err := utils.GenerateEthereumPrivateKey()
-		if err != nil {
-			panic(err)
 		}
-		voterPubKey := voterPrivKey.PublicKey
 
-		privKeys[i] = voterPrivKey
-		Voters[i] = utils.PubkeyToAddress(&voterPubKey)
+		newPolicySigRequests = append(newPolicySigRequests, &req)
+
 	}
 
-	return Voters, privKeys
+	signNewPolicyReq = pb.SignNewPolicyRequest{
+		PolicyBytes:             nextPolicyBytes,
+		PolicySignatureMessages: newPolicySigRequests,
+	}
+
+	res3, err := signingService.SignNewPolicy(context.Background(), &signNewPolicyReq)
+	if err != nil {
+		t.Errorf("Failed to send new Policy signatures 2: %v", err)
+	}
+
+	// * ----------------------------------------------------------------
+
+	prevPolicyHashString := policy.EncodeToHex(policy.SigningPolicyHash(initialPolicyBytes))
+	newPolicyHashString := policy.EncodeToHex(policy.SigningPolicyHash(nextPolicyBytes))
+
+	activePolicyHashString1 := res2.ActivePolicy // The active policy after the first batch of signatures
+	activePolicyHashString2 := res3.ActivePolicy // The active policy after the second batch of signatures
+
+	t.Logf("Previous policy Hash: %v\n", prevPolicyHashString)
+	t.Logf("Next policy Hash: %v\n", newPolicyHashString)
+
+	t.Logf("Active Policy Hash 1: %v\n", activePolicyHashString1)
+	t.Logf("Active Policy Hash 2: %v\n", activePolicyHashString2)
+
+	if activePolicyHashString1 != prevPolicyHashString {
+		t.Errorf("Policy was updated with insufficient voter weight")
+	}
+
+	if activePolicyHashString2 != newPolicyHashString {
+		t.Errorf("Policy was not updated with sufficient voter weight")
+	}
 
 }
 
-func generateRandomPolicyData(rewardEpochId uint32, voters []common.Address, seed int64) policy.SigningPolicy {
-	// Use specific seed for deterministic results
-	rgen := rand.New(rand.NewSource(seed))
+// * —————————————————————————————————————————————————————————————————————————————————————————— * //
 
-	StartVotingRoundId := rgen.Uint32()
-	Threshold := uint16(rgen.Uint32())
-	Seed := big.NewInt(rgen.Int63())
-	Weights := []uint16{}
+// ! InitializePolicy Tests —————————————————————————————————————————————————————————————————————— //
 
-	normalizedWeights := RandomNormalizedArray(NUM_VOTERS, seed)
-	for _, w := range normalizedWeights {
-		Weights = append(Weights, uint16(w*SIGNER_WEIGHT_DENOMINATION))
+// * Test initializing the policy after it has already been initialized  ----------------- //
+func TestInitializingThePolicyTwice(t *testing.T) {
+	defer testutils.ResetSigningServiceState() // Reset the state of the TEE after the test
+
+	epochId, randSeed := uint32(1), int64(12345)
+
+	_, initialPolicyBytes, voters, privKeys, err := testutils.GenerateRandomValidPolicyAndSigners(t, epochId, randSeed)
+	if err != nil {
+		t.Errorf("Failed to generate the initial policy")
 	}
 
-	return policy.SigningPolicy{
-		RewardEpochId:      rewardEpochId,
-		StartVotingRoundId: StartVotingRoundId,
-		Threshold:          Threshold,
-		Seed:               *Seed,
-		Voters:             voters,
-		Weights:            Weights,
+	// Set the initial policy hash in the config
+	setInitialPolicyHash(initialPolicyBytes)
+
+	numPolicies := 1
+	policySignaturesArray, err := testutils.GenerateRandomSignNewPolicyRequestArrays(t, epochId, randSeed, voters, privKeys, numPolicies)
+	if err != nil {
+		t.Errorf("Failed to generate the policy signatures")
 	}
+
+	req := pb.InitializePolicyRequest{
+		InitialPolicyBytes: initialPolicyBytes,
+		NewPolicyRequests:  policySignaturesArray,
+	}
+
+	signingService := NewService()
+
+	_, err = signingService.InitializePolicy(context.Background(), &req)
+	if err != nil {
+		t.Errorf("Failed to initialize the policy: %v", err)
+	}
+
+	// & Try to initialize the policy again ------------------------------------------- //
+	epochId2, randSeed2 := uint32(2), int64(54321)
+
+	_, initialPolicyBytes2, _, _, err := testutils.GenerateRandomValidPolicyAndSigners(t, epochId2, randSeed2)
+	if err != nil {
+		t.Errorf("Failed to generate the initial policy")
+	}
+
+	policySignaturesArray2, err := testutils.GenerateRandomSignNewPolicyRequestArrays(t, epochId2, randSeed2, voters, privKeys, numPolicies)
+	if err != nil {
+		t.Errorf("Failed to generate the policy signatures")
+	}
+
+	req2 := pb.InitializePolicyRequest{
+		InitialPolicyBytes: initialPolicyBytes2,
+		NewPolicyRequests:  policySignaturesArray2,
+	}
+
+	_, err = signingService.InitializePolicy(context.Background(), &req2)
+
+	// Convert error to gRPC status
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatal("expected gRPC error status")
+	}
+
+	// Check error code
+	if st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", st.Code())
+	}
+
+	// Check error message/description
+	if st.Message() != "policy already initialized" {
+		t.Errorf("expected 'policy already initialized', got %v", st.Message())
+	}
+
 }
 
-func RandomNormalizedArray(n int, seed int64) []float64 {
-	// Initialize random source with seed
-	source := rand.NewSource(seed)
-	r := rand.New(source)
+// * Test sending a signature with a wrong reward epoch id, less or equal to a previos one -- //
+func TestSendingInvalidReardEpochId(t *testing.T) {
+	defer testutils.ResetSigningServiceState() // Reset the state of the TEE after the test
 
-	// Generate random numbers
-	numbers := make([]float64, n)
-	sum := 0.0
+	epochId, randSeed := uint32(10), int64(12345)
 
-	for i := 0; i < n; i++ {
-		// Generate random float between 0 and 1
-		numbers[i] = r.Float64()
-		sum += numbers[i]
+	_, initialPolicyBytes, voters, privKeys, err := testutils.GenerateRandomValidPolicyAndSigners(t, epochId, randSeed)
+	if err != nil {
+		t.Errorf("Failed to generate the initial policy")
 	}
 
-	// Normalize to sum to 1
-	for i := 0; i < n; i++ {
-		numbers[i] /= sum
+	// Set the initial policy hash in the config
+	setInitialPolicyHash(initialPolicyBytes)
+
+	numPolicies := 1
+
+	// Decrease the reward epoch id to test if the policy is rejected
+	policySignaturesArray, err := testutils.GenerateRandomSignNewPolicyRequestArrays(t, epochId-1, randSeed, voters, privKeys, numPolicies)
+	if err != nil {
+		t.Errorf("Failed to generate the policy signatures")
 	}
 
-	return numbers
+	req := pb.InitializePolicyRequest{
+		InitialPolicyBytes: initialPolicyBytes,
+		NewPolicyRequests:  policySignaturesArray,
+	}
+
+	signingService := NewService()
+
+	_, err = signingService.InitializePolicy(context.Background(), &req)
+
+	// Convert error to gRPC status
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatal("expected gRPC error status")
+	}
+
+	// Check error code
+	if st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", st.Code())
+	}
+
+	// Check error message/description
+	if st.Message() != "Trying to initialize policy for an invalid reward epoch Id" {
+		t.Errorf("expected 'Trying to initialize policy for an invalid reward epoch Id', got %v", st.Message())
+	}
+
+}
+
+// * Verify that that the function fails if the voter weight is less than the Threshold -- //
+// TODO: Implement this test
+
+// * Verify that if two signatures use the same public key, it throws an error -- //
+// TODO:
+
+// * Test should fail if we don't ser setInitialPolicyHash(initialPolicyBytes) in the function -- //
+
+// ! SignNewPolicy Tests ———————————————————————————————————————————————————————————————————————— //
+
+// * verify the policy with invalid reward epoch id (should fail)
+
+// * Verify that if two signatures from the same request use the same public key, it throws a 'Attempted double signing' error -- //
+
+// * Verify that if two signatures from different request use the same public key, it throws a 'Attempted double signing' error -- //
+
+// * Test that the voter weight is incremented correctly (Check that the policy only gets updated when the threshold is reached) -- //
+
+// * UTILS ================================================================================================ * //
+// * ====================================================================================================== * //
+
+// Set the initial policy hash in the config
+// We need this to make the tests work for randomly generated policies
+func setInitialPolicyHash(initialPolicyBytes []byte) {
+	// Set the initial policy hash in the config
+	config.InitialPolicyHash = policy.EncodeToHex(policy.SigningPolicyHash(initialPolicyBytes))
+}
+
+// Loop through the voters and weights and calculate the total weight
+// return the index of the voter at which the accumulaterd voterWeight passes the threshold
+func getTresholdRechedVoterIndex(nextPolicy *policy.SigningPolicy, voterPrivKeys []*ecdsa.PrivateKey) int {
+
+	var weightSum uint16 = 0
+	for i := 0; i < len(voterPrivKeys); i++ {
+
+		pubKey := voterPrivKeys[i].PublicKey
+		voterWeight := policy.GetSignerWeight(&pubKey, nextPolicy)
+
+		weightSum += voterWeight
+
+		if weightSum >= nextPolicy.Threshold {
+			return i
+		}
+
+	}
+
+	return len(voterPrivKeys) - 1
 }
