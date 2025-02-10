@@ -16,6 +16,7 @@ import (
 	utilsserver "tee-node/internal/utils"
 	"tee-node/internal/wallets"
 	utils "tee-node/tests"
+	"tee-node/tests/client/attestation"
 	"tee-node/tests/client/config"
 	"tee-node/tests/client/policy"
 
@@ -32,7 +33,7 @@ var args struct {
 	Arg1   string
 	Arg2   string
 	Arg3   string
-	Config string `default:"config.toml"`
+	Config string `default:"tests/configs/config_client.toml"`
 }
 
 // TODO: make cli configurable calls
@@ -204,6 +205,31 @@ func main() {
 			log.Fatalf("could not create a new wallet: %v", err)
 		}
 		logger.Infof("public key: %s, attestation token %s", pubKeyResp.Address, pubKeyResp.Token)
+
+	case "google_attestation":
+		attestationClient := attestationv1.NewAttestationServiceClient(clientConn)
+
+		// var nonces []string =
+		attestationTokenResponse, err := attestationClient.GetAttestationToken(ctx, &attestationv1.GetAttestationTokenRequest{
+			Nonces: []string{args.Arg1},
+		})
+		if err != nil {
+			log.Fatalf("could not sign: %v", err)
+		}
+
+		jwtBytes := []byte(attestationTokenResponse.JwtBytes)
+		tokenClaims, err := attestation.VerifyAttestationToken(jwtBytes)
+
+		if err != nil {
+			log.Fatalf("could not verify attestation token: %v", err)
+		}
+
+		jwtData, err := attestation.DecodeAttestationToken(tokenClaims)
+
+		log.Printf("Image Digest: %v\n", jwtData.Submods.Container.ImageDigest)
+		log.Printf("Dbgstat: %v\n", jwtData.Dbgstat)
+		log.Printf("Support Attributes: %v\n", jwtData.Submods.ConfidentialSpace.SupportAttributes)
+		log.Printf("Hwmodel: %v\n", jwtData.Hwmodel)
 
 	case "split_wallet":
 		// Create a gRPC wallet client
