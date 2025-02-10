@@ -8,6 +8,7 @@ require (
 	github.com/alexflint/go-arg v1.5.1
 	github.com/ethereum/go-ethereum v1.14.12
 	github.com/flare-foundation/go-flare-common v1.0.1
+	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/go-tpm-tools v0.4.4
 	github.com/gorilla/mux v1.8.1
 	github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416
