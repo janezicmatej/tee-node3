@@ -27,8 +27,6 @@ import (
 	"github.com/flare-foundation/go-flare-common/pkg/logger"
 )
 
-const GCP_INSTANCE_IP = "localhost"
-
 var args struct {
 	Call   string
 	Arg1   string

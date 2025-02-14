@@ -24,6 +24,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server cmd/server/main.go
 # Final stage  
 FROM alpine:latest
 
+COPY /config/config.toml /config/config.toml
+
 # Import certificates from builder  
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/  
 
@@ -37,7 +39,7 @@ ENV TZ=UTC
 EXPOSE 80
 EXPOSE 443/tcp
 EXPOSE 81/udp
-EXPOSE 50051  
+EXPOSE 8545
 
 # Run the application  
-CMD ["/app/server"]
+CMD ["/app/server", "--config", "config/config.toml"]

@@ -65,31 +65,25 @@ The server supports two types of Confidential Computing hardware:
 
 ### Build Docker container
 
-On Intel arm64 based machines
+On Intel/AMD arm64 based machines:
 ```bash
-docker build -t <IMAGE-TAG> --no-cache .
+docker build -t us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest --no-cache
 ```
 
-On Apple silicon (M1, M2, M3 processors)
-```
+On Apple silicon (M1, M2, M3 processors):
+```bash
 docker buildx create --use
-docker buildx build --platform linux/amd64 -t us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest . --push
+docker buildx build --platform linux/amd64 -t us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest . --no-cache --load
 ```
 
-
+Set up Docker authetication for artifact registry
 ```bash
-docker tag <IMAGE-TAG> \
-us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest
-```
-
-Set up Docker authetication
-```bash
-gcloud auth configure-docker us-west1-docker.pkg.dev
+gcloud auth configure-docker us-docker.pkg.dev
 ```
 
 Add image to Artifact Registry
 ```bash
-docker push us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest
+docker push us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest
 ```
 
 ### Deployment Steps
@@ -113,7 +107,7 @@ gcloud compute instances create <INSTANCE-NAME> \
     --image-family=<IMAGE-FAMILY> \
     --service-account=confidential-sa@flare-network-sandbox.iam.gserviceaccount.com \
     --tags=grpc-server \
-    --metadata="^~^tee-image-reference=us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest"
+    --metadata="^~^tee-image-reference=us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest"
 ```
 
 #### Parameter Explanation
