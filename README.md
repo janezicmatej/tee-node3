@@ -65,17 +65,25 @@ The server supports two types of Confidential Computing hardware:
 
 ### Build Docker container
 
+On Intel/AMD arm64 based machines:
 ```bash
-docker build -t <IMAGE-TAG> --no-cache .
+docker build -t us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest --no-cache
 ```
 
+On Apple silicon (M1, M2, M3 processors):
 ```bash
-docker tag <IMAGE-TAG> \
-us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest
+docker buildx create --use
+docker buildx build --platform linux/amd64 -t us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest . --no-cache --load
 ```
 
+Set up Docker authetication for artifact registry
 ```bash
-docker push us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest
+gcloud auth configure-docker us-docker.pkg.dev
+```
+
+Add image to Artifact Registry
+```bash
+docker push us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest
 ```
 
 ### Deployment Steps
@@ -98,8 +106,8 @@ gcloud compute instances create <INSTANCE-NAME> \
     --image-project=confidential-space-images \
     --image-family=<IMAGE-FAMILY> \
     --service-account=confidential-sa@flare-network-sandbox.iam.gserviceaccount.com \
-    --tags=grpc-server \
-    --metadata="^~^tee-image-reference=us-west1-docker.pkg.dev/flare-network-sandbox/quickstart-docker-repo/quickstart-image:latest"
+    --tags=rpc-server \
+    --metadata="^~^tee-image-reference=us-docker.pkg.dev/flare-network-sandbox/flare-tee/tee-node:latest"
 ```
 
 #### Parameter Explanation
@@ -124,14 +132,14 @@ gcloud compute instances create <INSTANCE-NAME> \
 The following command creates a firewall rule to allow gRPC traffic on port 50051. This needs to be executed only once per project.
 
 ```bash
-gcloud compute firewall-rules create allow-grpc-port-50051 \
+gcloud compute firewall-rules create allow-port-8545 \
     --network=default \
     --priority=1000 \
     --direction=INGRESS \
     --action=ALLOW \
-    --rules=tcp:50051 \
+    --rules=tcp:8545 \
     --source-ranges=0.0.0.0/0 \
-    --target-tags=grpc-server
+    --target-tags=<CUSTOM_TAG>
 ```
 
 ⚠️ **Security Note**: The current firewall rule allows access from any IP (`0.0.0.0/0`). For production environments, we would restrict this to only specific IPs (data provider or other TEEs).

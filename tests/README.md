@@ -74,6 +74,12 @@ Check if the wallet is on the server
 go run tests/client/cmd/main.go --call pub_key --arg1 foo --config tests/configs/config_client.toml
 ```
 
+### Get google attestation
+Get google attestation token (you must provide nonce in arg1 otherwise service fails - nonce must be between 8 and 88 bytes)
+```bash
+go run tests/client/cmd/main.go --call google_attestation --arg1 1234567890 --config tests/configs/config_client.toml
+```
+
 ## Unit tests
 
 Before running policy tests for a client, set up a database with indexed data from

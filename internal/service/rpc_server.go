@@ -26,7 +26,7 @@ func LaunchServer(port int) {
 	if err != nil {
 		log.Fatalf("Failed to register policy service: %v", err)
 	}
-	err = server.RegisterName("attestaionservice", attestationservice.NewService())
+	err = server.RegisterName("attestationservice", attestationservice.NewService())
 	if err != nil {
 		log.Fatalf("Failed to register attestation service: %v", err)
 	}
