@@ -2,6 +2,7 @@ package wallets
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"tee-node/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,22 +19,22 @@ type Wallet struct {
 	XrpAddress string
 }
 
-func CreateNewWallet(name string) (string, error) {
+func CreateNewWallet(name string) error {
 	sk, err := utils.GenerateEthereumPrivateKey()
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	sec1PubKey := utils.SerializeCompressed(&sk.PublicKey)
 	xrpAddress, err := utils.GetXrpAddressFromPubkey(sec1PubKey)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	newWallet := Wallet{Name: name, PrivateKey: sk, Address: crypto.PubkeyToAddress(sk.PublicKey), XrpAddress: xrpAddress}
 	wallets[name] = &newWallet
 
-	return newWallet.Address.Hex(), nil
+	return nil
 }
 
 func GetXrpAddress(name string) (string, error) {
@@ -70,6 +71,7 @@ func AddWallet(wallet *Wallet) error {
 }
 
 func RemoveWallet(walletName string) {
+	fmt.Printf("Removing wallet %s\n", walletName)
 	delete(wallets, walletName)
 }
 

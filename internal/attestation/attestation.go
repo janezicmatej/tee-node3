@@ -3,7 +3,7 @@ package attestation
 import (
 	"crypto/x509"
 	"fmt"
-	"tee-node/config"
+	"tee-node/internal/config"
 
 	"github.com/pkg/errors"
 )

@@ -14,10 +14,7 @@ import (
 
 	attestationserver "tee-node/internal/attestation"
 	policyserver "tee-node/internal/policy"
-	"tee-node/internal/requests"
-	"tee-node/internal/signing"
 	utilsserver "tee-node/internal/utils"
-	"tee-node/internal/wallets"
 	utils "tee-node/tests"
 	"tee-node/tests/client/attestation"
 	"tee-node/tests/client/config"
@@ -37,6 +34,7 @@ var args struct {
 	Arg1   string
 	Arg2   string
 	Arg3   string
+	Arg4   string
 	Config string `default:"tests/configs/config_client.toml"`
 }
 
@@ -134,7 +132,7 @@ func main() {
 		fmt.Println(hex.EncodeToString(hash))
 
 		numPolicies := 5
-		policySignaturesArray, err := utils.GenerateRandomSignNewPolicyRequestArrays(epochId, randSeed, providers.Voters, providers.PrivKeys, numPolicies)
+		policySignaturesArray, err := utils.GenerateRandomMultiSignedPolicyArray(epochId, randSeed, providers.Voters, providers.PrivKeys, numPolicies)
 		if err != nil {
 			log.Fatalf("could not generate random policy policy: %v", err)
 		}
@@ -158,59 +156,59 @@ func main() {
 		}
 
 		walletName := args.Arg2
+		instructionId := args.Arg3
 
-		newWalletRequest := wallets.NewNewWalletRequest(walletName)
-		signature, err := requests.Sign(newWalletRequest, providerPrivKey)
+		instruction, err := utils.BuildMockInstruction("WALLET",
+			"KEY_GENERATE",
+			api.NewWalletRequest{Name: walletName},
+			providerPrivKey,
+			instructionId)
 		if err != nil {
-			log.Fatalf("%v", err)
+			log.Fatalf("could not initialize policy: %v", err)
 		}
 
-		req := &api.NewWalletRequest{
-			Name:      walletName,
-			Nonce:     hex.EncodeToString(nonceBytes),
-			Signature: signature,
-		}
-		var resp api.NewWalletResponse
-		err = client.Call(&resp, "walletsservice_newWallet", req)
+		var resp api.InstructionResponse
+		err = client.Call(&resp, "instructionservice_sendSignedInstruction", instruction)
 		if err != nil {
 			log.Fatalf("could not create a new wallet: %v", err)
 		}
 
-		logger.Infof("created a wallet, attestation token %s", resp.Token)
+		logger.Infof("created a wallet: finalized:%v", resp.Finalized)
 
 	case "pub_key":
+		// TODO: Remove this function
 		walletName := args.Arg1
 
-		req := &api.PublicKeyRequest{
-			Name:  walletName,
-			Nonce: hex.EncodeToString(nonceBytes),
+		req := &api.WalletInfoRequest{
+			Name:      walletName,
+			Challenge: hex.EncodeToString(nonceBytes),
 		}
 
-		var pubKeyResp api.PublicKeyResponse
-		err = client.Call(&pubKeyResp, "walletsservice_publicKey", req)
+		var pubKeyResp api.WalletInfoResponse
+		err = client.Call(&pubKeyResp, "instructionservice_walletInfo", req)
 		if err != nil {
 			log.Fatalf("could not create a new wallet: %v", err)
 		}
-		logger.Infof("ethAddress: %s, public key: %s, attestation token %s", pubKeyResp.EthAddress, pubKeyResp.PublicKey, pubKeyResp.Token)
+		logger.Infof("ethAddress: %s, public key: %s, attestation token %s", pubKeyResp.EthAddress, pubKeyResp.EthPublicKey.X, pubKeyResp.Token)
 
-	case "multisig_account_info":
+	case "wallet_info":
 		walletName := args.Arg1
 		nonceBytes, err := utilsserver.GenerateRandomBytes(32)
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
 
-		req := &api.PublicKeyRequest{
-			Name:  walletName,
-			Nonce: hex.EncodeToString(nonceBytes),
+		req := &api.WalletInfoRequest{
+			Name:      walletName,
+			Challenge: hex.EncodeToString(nonceBytes),
 		}
 
-		var accInfoResp api.MultisigAccountInfoResponse
-		err = client.Call(&accInfoResp, "walletsservice_multisigAccountInfo", req)
+		var accInfoResp api.WalletInfoResponse
+		err = client.Call(&accInfoResp, "instructionservice_walletInfo", req)
 		if err != nil {
 			log.Fatalf("could not create a new wallet: %v", err)
 		}
-		logger.Infof("xrpAddress: %s, public key: %s, attestation token %s", accInfoResp.XrpAddress, accInfoResp.PublicKey, accInfoResp.Token)
+		logger.Infof("EthAddress: %s, XrpAddress: %s, PublicKey: %s, Attestation Token %s", accInfoResp.EthAddress, accInfoResp.XrpAddress, accInfoResp.XrpPublicKey, accInfoResp.Token)
 
 	case "google_attestation":
 		var resp api.GetAttestationTokenResponse
@@ -242,6 +240,10 @@ func main() {
 			log.Fatalf("could not get attestation: %v", err)
 		}
 
+		teeId := resp.Data.Uuid
+		pubKey := resp.Data.SigningPublicKey.X
+
+		logger.Infof("TeeId: %v PubKey: %v\n", teeId, pubKey)
 		logger.Infof("node info: %v", resp.Data)
 
 		if resp.Token != "" {
@@ -311,6 +313,8 @@ func main() {
 		}
 
 		walletName := args.Arg2
+		paymentHash := args.Arg3
+		instructionId := args.Arg4
 
 		txHash, err := hex.DecodeString(args.Arg3)
 		if err != nil {
@@ -318,57 +322,55 @@ func main() {
 		}
 
 		// ---------- Sign the message request ---------- //
-		paymentSigRequest, err := signing.NewSignPaymentRequest(walletName, args.Arg3)
+
+		instruction, err := utils.BuildMockInstruction(
+			"XRP",
+			"PAY",
+			api.SignPaymentRequest{WalletName: walletName, PaymentHash: paymentHash},
+			providerPrivKey,
+			instructionId,
+		)
 		if err != nil {
-			log.Fatalf("could not create sign payment request: %v", err)
-		}
-		signature, err := requests.Sign(paymentSigRequest, providerPrivKey)
-		if err != nil {
-			log.Fatalf("could not sign: %v", err)
+			log.Fatalf("could not initialize policy: %v", err)
 		}
 
 		// ---------- Send the transaction to the signing service ---------- //
-		nonceBytes, _ := utilsserver.GenerateRandomBytes(32)
 
-		req := &api.SignPaymentTransactionRequest{
-			WalletName:  walletName,
-			PaymentHash: hex.EncodeToString(txHash),
-			Signature:   signature,
-			Challenge:   hex.EncodeToString(nonceBytes),
-		}
-
-		var resp api.ResponseMessage
-		err = client.Call(&resp, "signingservice_signPaymentTransaction", req)
+		var resp api.InstructionResponse
+		err = client.Call(&resp, "instructionservice_sendSignedInstruction", instruction)
 		if err != nil {
 			log.Fatalf("could not sign payment transaction: %v", err)
 		}
 
 		logger.Info("Payment hash: %v", hex.EncodeToString(txHash))
-		logger.Infof("sent request to SignPaymentTransaction, is ThresholdReached %v, Message %s, Token %v", resp.ThresholdReached, resp.Message, resp.Token)
+		logger.Infof("sent request to SignPaymentTransaction, is ThresholdReached %v, Data %s, Token %v", resp.Finalized, resp.Data, resp.Token)
 
 	case "get_payment_signature":
-
-		walletName := args.Arg1
-		PaymentHash := args.Arg2
-
+		instructionId := args.Arg1
 		nonceBytes, _ := utilsserver.GenerateRandomBytes(32)
 
-		req := &api.GetPaymentSignatureRequest{
-			WalletName:  walletName,
-			PaymentHash: PaymentHash,
-			Challenge:   hex.EncodeToString(nonceBytes),
+		req := &api.InstructionResultRequest{
+			InstructionId: instructionId,
+			Challenge:     hex.EncodeToString(nonceBytes),
 		}
 
-		var resp api.GetPaymentSignatureResponse
-		err = client.Call(&resp, "signingservice_getPaymentSignature", req)
+		var resp api.InstructionResultResponse
+		err = client.Call(&resp, "instructionservice_instructionResult", req)
 		if err != nil {
-			log.Fatalf("could not get thepayment signature : %v", err)
+			log.Fatalf("could not get the payment signature : %v", err)
 		}
 
-		txnSignature := hex.EncodeToString(resp.TxnSignature)
-		signingPubKey := hex.EncodeToString(resp.SigningPubKey)
+		var paymentSigResponse api.GetPaymentSignatureResponse
+		err := json.Unmarshal(resp.Data, &paymentSigResponse)
+		if err != nil {
+			log.Fatalf("could not decode the payment signature : %v", err)
+		}
 
-		logger.Infof("sent request to GetPaymentSignature, is Account %v, TxnSignature %s, PublicKey %s, Token %v", resp.Account, txnSignature, signingPubKey, resp.Token)
+		txnSignature := hex.EncodeToString(paymentSigResponse.TxnSignature)
+		signingPubKey := hex.EncodeToString(paymentSigResponse.SigningPubKey)
+
+		logger.Infof("sent request to GetPaymentSignature, is Account %v, TxnSignature %s, PublicKey %s, Token %v",
+			paymentSigResponse.Account, txnSignature, signingPubKey, resp.Token)
 
 	case "split_wallet":
 		providerPrivKey, err := getProviderPrivKey(args.Arg1)
@@ -377,32 +379,50 @@ func main() {
 		}
 
 		walletName := args.Arg2
+		instructionId := args.Arg3
 
-		numBackups := len(config.Server.Backups)
-		newSplitWalletRequest, err := wallets.NewSplitWalletRequest(walletName, make([]string, numBackups), config.Server.Backups, config.Server.PubKeys, config.Server.BackupsThreshold)
-		if err != nil {
-			log.Fatalf("%v", err)
-		}
-		signature, err := requests.Sign(newSplitWalletRequest, providerPrivKey)
-		if err != nil {
-			log.Fatalf("%v", err)
+		type NodeInfo struct {
+			TeeId  string `json:"tee_id"`
+			PubKey string `json:"pub_key"`
 		}
 
-		req := &api.SplitWalletRequest{
-			Name:      walletName,
-			TeeIds:    newSplitWalletRequest.IDs,
-			Hosts:     newSplitWalletRequest.Hosts,
-			Threshold: int64(newSplitWalletRequest.Threshold),
-			Signature: signature,
-			Nonce:     hex.EncodeToString(nonceBytes),
-		}
-		var resp api.SplitWalletResponse
-		err = client.Call(&resp, "walletsservice_splitWallet", req)
-		if err != nil {
-			log.Fatalf("could not create a new wallet: %v", err)
+		// Parse the JSON
+		var nodeInfos []NodeInfo
+		if err := json.Unmarshal([]byte(args.Arg4), &nodeInfos); err != nil {
+			log.Fatalf("Failed to parse JSON: %v", err)
 		}
 
-		logger.Infof("sent request to split wallet, is finalized %v, attestation token %s", resp.Finalized, resp.Token)
+		teeIds := make([]string, len(nodeInfos))
+		pubKeys := make([]string, len(nodeInfos))
+		for i, info := range nodeInfos {
+			teeIds[i] = info.TeeId
+			pubKeys[i] = info.PubKey
+		}
+
+		// ---------- Split the wallet request ---------- //
+		instruction, err := utils.BuildMockInstruction("WALLET",
+			"KEY_MACHINE_BACKUP",
+			api.SplitWalletRequest{
+				Name:       walletName,
+				TeeIds:     teeIds,
+				Hosts:      config.Server.Backups,
+				PublicKeys: pubKeys,
+				Threshold:  int64(config.Server.BackupsThreshold),
+			},
+			providerPrivKey,
+			instructionId,
+		)
+		if err != nil {
+			log.Fatalf("could not initialize policy: %v", err)
+		}
+
+		var resp api.InstructionResponse
+		err = client.Call(&resp, "instructionservice_sendSignedInstruction", instruction)
+		if err != nil {
+			log.Fatalf("could not split wallet: %v", err)
+		}
+
+		logger.Infof("sent request to split wallet, is finalized %v", resp.Finalized)
 
 	case "recover_wallet":
 		providerPrivKey, err := getProviderPrivKey(args.Arg1)
@@ -411,7 +431,19 @@ func main() {
 		}
 
 		walletName := args.Arg2
-		address := args.Arg3
+		instructionId := args.Arg3
+
+		type RecoverInfo struct {
+			TeeIds  []string `json:"tee_ids"`
+			PubKey  string   `json:"pub_key"`
+			Address string   `json:"address"`
+		}
+
+		// Parse the JSON
+		var recoverInfo RecoverInfo
+		if err := json.Unmarshal([]byte(args.Arg4), &recoverInfo); err != nil {
+			log.Fatalf("Failed to parse JSON: %v", err)
+		}
 
 		numBackups := len(config.Server.Backups)
 
@@ -420,28 +452,23 @@ func main() {
 			shareIds[i] = strconv.Itoa(i + 1)
 		}
 
-		newRecoverWalletRequest, err := wallets.NewRecoverWalletRequest(walletName, make([]string, numBackups), config.Server.Backups, shareIds, config.Server.PubKey)
+		instruction, err := utils.BuildMockInstruction("WALLET", "KEY_MACHINE_RESTORE", api.RecoverWalletRequest{
+			Name:      walletName,
+			TeeIds:    recoverInfo.TeeIds,
+			Hosts:     config.Server.Backups,
+			ShareIds:  shareIds,
+			PublicKey: recoverInfo.PubKey,
+			Address:   recoverInfo.Address,
+			Threshold: int64(config.Server.BackupsThreshold),
+		}, providerPrivKey,
+			instructionId,
+		)
 		if err != nil {
-			log.Fatalf("%v", err)
-		}
-		signature, err := requests.Sign(newRecoverWalletRequest, providerPrivKey)
-		if err != nil {
-			log.Fatalf("%v", err)
+			log.Fatalf("could not initialize policy: %v", err)
 		}
 
-		req := &api.RecoverWalletRequest{
-			Name:      walletName,
-			TeeIds:    newRecoverWalletRequest.IDs,
-			Hosts:     newRecoverWalletRequest.Hosts,
-			ShareIds:  newRecoverWalletRequest.ShareIds,
-			PublicKey: newRecoverWalletRequest.PubKey,
-			Address:   address,
-			Threshold: int64(config.Server.BackupsThreshold),
-			Signature: signature,
-			Nonce:     hex.EncodeToString(nonceBytes),
-		}
-		var resp api.RecoverWalletResponse
-		err = client.Call(&resp, "walletsservice_recoverWallet", req)
+		var resp api.InstructionResponse
+		err = client.Call(&resp, "instructionservice_sendSignedInstruction", instruction)
 		if err != nil {
 			log.Fatalf("could not create a new wallet: %v", err)
 		}

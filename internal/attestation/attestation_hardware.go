@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-tpm-tools/proto/attest"
 )
 
-func CreateAttestation(nonce []byte) (*attest.Attestation, error) {
+func CreateHardwareAttestation(nonce []byte) (*attest.Attestation, error) {
 	var attestOpts client.AttestOpts
 	attestOpts.Nonce = nonce
 

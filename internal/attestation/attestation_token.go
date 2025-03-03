@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"tee-node/internal/config"
+
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -90,6 +92,20 @@ func GetGoogleAttestationToken(nonces []string, tokenType string) ([]byte, error
 	}
 
 	return tokenbytes, nil
+}
+
+func CreateAttestation(nonces []string, tokenType string) (string, error) {
+
+	var tokenBytes []byte
+	var err error
+	if config.Mode == 0 {
+		tokenBytes, err = GetGoogleAttestationToken(nonces, tokenType)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return string(tokenBytes), nil
 }
 
 // ValidatePKIToken validates the PKI token returned from the attestation service is valid.

@@ -9,11 +9,10 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
-	"tee-node/internal/service/attestationservice"
+
+	"tee-node/internal/service/instructionservice"
 	"tee-node/internal/service/nodeservice"
 	"tee-node/internal/service/policyservice"
-	"tee-node/internal/service/signingservice"
-	"tee-node/internal/service/walletsservice"
 
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -23,25 +22,14 @@ func LaunchServer(port int) {
 	server := rpc.NewServer()
 
 	// Register services
-	err := server.RegisterName("policyservice", policyservice.NewService())
-	if err != nil {
+	if err := server.RegisterName("instructionservice", instructionservice.NewService()); err != nil {
+		log.Fatalf("Failed to register instruction service: %v", err)
+	}
+	if err := server.RegisterName("policyservice", policyservice.NewService()); err != nil {
 		log.Fatalf("Failed to register policy service: %v", err)
 	}
-	err = server.RegisterName("attestationservice", attestationservice.NewService())
-	if err != nil {
-		log.Fatalf("Failed to register attestation service: %v", err)
-	}
-	err = server.RegisterName("walletsservice", walletsservice.NewService())
-	if err != nil {
-		log.Fatalf("Failed to register wallets service: %v", err)
-	}
-	err = server.RegisterName("signingservice", signingservice.NewService())
-	if err != nil {
-		log.Fatalf("Failed to register wallets service: %v", err)
-	}
-	err = server.RegisterName("nodeservice", nodeservice.NewService())
-	if err != nil {
-		log.Fatalf("Failed to register node service: %v", err)
+	if err := server.RegisterName("nodeservice", nodeservice.NewService()); err != nil {
+		log.Fatalf("Failed to register policy service: %v", err)
 	}
 
 	listener, err := net.Listen("tcp", "0.0.0.0:"+strconv.Itoa(port))

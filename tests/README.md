@@ -31,8 +31,8 @@ go run tests/client/cmd/main.go --call initial_policy_simulate --config tests/co
 Use 2 out of 3 data providers to create a new wallet with unique ID `foo` and get its address:
 
 ```bash
-go run tests/client/cmd/main.go --call new_wallet --arg1 0 --arg2 foo --config tests/configs/config_client.toml
-go run tests/client/cmd/main.go --call new_wallet --arg1 1 --arg2 foo --config tests/configs/config_client.toml
+go run tests/client/cmd/main.go --call new_wallet --arg1 0 --arg2 foo --arg3 1234 --config tests/configs/config_client.toml
+go run tests/client/cmd/main.go --call new_wallet --arg1 1 --arg2 foo --arg3 1234 --config tests/configs/config_client.toml
 
 go run tests/client/cmd/main.go --call pub_key --arg1 foo --config tests/configs/config_client.toml
 ```
@@ -43,8 +43,8 @@ The last command should return the address of the generated wallet. Now backup t
 2 out of 2.
 
 ```bash
-go run tests/client/cmd/main.go --call split_wallet --arg1 0 --arg2 foo --config tests/configs/config_client.toml
-go run tests/client/cmd/main.go --call split_wallet --arg1 1 --arg2 foo --config tests/configs/config_client.toml
+go run tests/client/cmd/main.go --call split_wallet --arg1 0 --arg2 foo --arg3 12345 --config tests/configs/config_client.toml
+go run tests/client/cmd/main.go --call split_wallet --arg1 1 --arg2 foo --arg3 12345 --config tests/configs/config_client.toml
 ```
 
 ### Recover a wallet
@@ -64,8 +64,8 @@ go run tests/client/cmd/main.go --call initial_policy_simulate --config tests/co
 and recover the wallet, by running the following commands replacing the address with the address obtained before
 
 ```bash
-go run tests/client/cmd/main.go --call recover_wallet --arg1 0 --arg2 foo --arg3 0xb06023c32B5326293bccf78BFf4Be42FD9554c7a --config tests/configs/config_client.toml
-go run tests/client/cmd/main.go --call recover_wallet --arg1 1 --arg2 foo --arg3 0xb06023c32B5326293bccf78BFf4Be42FD9554c7a --config tests/configs/config_client.toml
+go run tests/client/cmd/main.go --call recover_wallet --arg1 0 --arg2 foo --arg3 0xb06023c32B5326293bccf78BFf4Be42FD9554c7a --arg4 123456 --config tests/configs/config_client.toml
+go run tests/client/cmd/main.go --call recover_wallet --arg1 1 --arg2 foo --arg3 0xb06023c32B5326293bccf78BFf4Be42FD9554c7a --arg4 123456 --config tests/configs/config_client.toml
 ```
 
 Check if the wallet is on the server
@@ -75,7 +75,9 @@ go run tests/client/cmd/main.go --call pub_key --arg1 foo --config tests/configs
 ```
 
 ### Get google attestation
+
 Get google attestation token (you must provide nonce in arg1 otherwise service fails - nonce must be between 8 and 88 bytes)
+
 ```bash
 go run tests/client/cmd/main.go --call google_attestation --arg1 1234567890 --config tests/configs/config_client.toml
 ```

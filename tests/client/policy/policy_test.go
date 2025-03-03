@@ -2,7 +2,7 @@ package policy
 
 import (
 	"context"
-	"fmt"
+	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -11,7 +11,7 @@ import (
 
 	"github.com/flare-foundation/go-flare-common/pkg/database"
 
-	"tee-node/config"
+	"tee-node/internal/config"
 	pd "tee-node/internal/policy"
 	ps "tee-node/internal/service/policyservice"
 )
@@ -30,7 +30,6 @@ func TestFetchPolicyHistory(t *testing.T) {
 	require.NoError(t, err)
 	_ = policies
 	_ = signatures
-	fmt.Println(len(policies), len(signatures), maxInt)
 }
 
 func TestPolicyDecodingEncoding(t *testing.T) {
@@ -93,7 +92,7 @@ func TestPolicyReplayingWithIndexerData(t *testing.T) {
 
 	signingService := ps.NewService()
 
-	config.InitialPolicyHash = pd.EncodeToHex(pd.SigningPolicyHash(req.InitialPolicyBytes))
+	config.InitialPolicyHash = hex.EncodeToString(pd.SigningPolicyHash(req.InitialPolicyBytes))
 
 	_, err = signingService.InitializePolicy(context.Background(), req)
 	require.NoError(t, err)

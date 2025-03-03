@@ -2,7 +2,11 @@ package policyservice
 
 import (
 	"context"
+	"encoding/hex"
+	"tee-node/internal/attestation"
+	"tee-node/internal/config"
 	"tee-node/internal/policy"
+	"tee-node/internal/requests"
 
 	api "tee-node/api/types"
 
@@ -25,7 +29,7 @@ func (s *Service) InitializePolicy(ctx context.Context, req *api.InitializePolic
 	default:
 	}
 
-	err := policy.InitializePolicyInternal(req)
+	err := InitializePolicyInternal(req)
 	if err != nil {
 		return nil, err
 	}
@@ -40,13 +44,37 @@ func (s *Service) SignNewPolicy(ctx context.Context, req *api.SignNewPolicyReque
 	default:
 	}
 
-	err := policy.SignNewPolicyInternal(req)
+	signPolicyRequest := policy.NewSignPaymentRequest(req.PolicyBytes)
+
+	requestCounter, thresholdReached, err := requests.ProcessRequest(signPolicyRequest, req.Signature.Signature)
 	if err != nil {
 		return nil, err
 	}
 
+	if thresholdReached && !requestCounter.Done {
+
+		err = policy.SetNewPolicyInternal(req)
+		if err != nil {
+			return nil, err
+		}
+
+		requestCounter.Done = true
+	}
+
+	// Get the attestation token
+	nonces := []string{req.Challenge, requestCounter.Request.Identifier()}
+	var tokenBytes []byte
+	if config.Mode == 0 {
+		tokenBytes, err = attestation.GetGoogleAttestationToken(nonces, attestation.OIDCTokenType)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &api.SignNewPolicyResponse{
-		ActivePolicy: policy.EncodeToHex(policy.ActiveSigningPolicyHash),
+		ActivePolicy:     hex.EncodeToString(policy.ActiveSigningPolicyHash),
+		ThresholdReached: thresholdReached,
+		Token:            string(tokenBytes),
 	}, nil
 }
 
@@ -67,8 +95,19 @@ func (s *Service) GetActivePolicy(ctx context.Context, req *api.GetActivePolicyR
 		return nil, err
 	}
 
+	// Get the attestation token
+	nonces := []string{req.Challenge, hex.EncodeToString(activePolicyBytes)}
+	var tokenBytes []byte
+	if config.Mode == 0 {
+		tokenBytes, err = attestation.GetGoogleAttestationToken(nonces, attestation.OIDCTokenType)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &api.GetActivePolicyResponse{
 		ActivePolicy:     activePolicyBytes,
-		ActivePolicyHash: policy.EncodeToHex(policy.ActiveSigningPolicyHash),
+		ActivePolicyHash: hex.EncodeToString(policy.ActiveSigningPolicyHash),
+		Token:            string(tokenBytes),
 	}, nil
 }

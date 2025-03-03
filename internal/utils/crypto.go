@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/nacl/box"
 
-	"tee-node/config"
+	"tee-node/internal/config"
 
 	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
@@ -38,7 +38,8 @@ func PubkeyToAddress(pubkey *ecdsa.PublicKey) common.Address {
 
 func Sign(msgHash []byte, privKey *ecdsa.PrivateKey) ([]byte, error) {
 	if len(msgHash) != 32 {
-		return nil, fmt.Errorf("invalid signing policy hash length")
+		fmt.Printf("invalid message hash length: %d\n", msgHash)
+		return nil, fmt.Errorf("invalid message hash length")
 	}
 
 	hashSignature, err := crypto.Sign(accounts.TextHash(msgHash), privKey)
