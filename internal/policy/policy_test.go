@@ -22,7 +22,5 @@ package policy
 
 // ? some basic tests
 
-// ! PreventDoubleSigning
-
 // ? some basic tests
 

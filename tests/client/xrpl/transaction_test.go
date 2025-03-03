@@ -186,30 +186,3 @@ func getSampleTransaction() (*xrputils.Payment, error) {
 
 	return payment, nil
 }
-
-// -------- Helper functions -------- //
-
-// func xrpSignTransaction(txHash []byte, privKey []byte) []byte {
-
-// 	sig, err := xrputils.SignECDSA(privKey, txHash)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	return sig
-// }
-
-// func xrpVerifyTransactionSig(txHash []byte, txSignature []byte, publicKey string) (bool, error) {
-// 	pubKeyBytes, err := hex.DecodeString(publicKey)
-// 	if err != nil {
-// 		return false, err
-// 	}
-
-// 	return xrputils.VerifyECDSA(pubKeyBytes, txSignature, txHash)
-// }
-
-//     1 2 3 4 5 6 7  8  9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// TS: 534D5400120000 22 0000000024 0040C7 5B
-// GO: 534d5400120000 22 0000000024 0040c7 58
-
-// 534d5400120000 22 0000000024 0040c7 5b 201b0048bb5361400000000097d3306840000000000003de73008114f1ada4636583e2dd405af86ac98145d180b22f01831496661e656f4e0995fb56e0af6a69846107e0c8cf96661e656f4e0995fb56e0af6a69846107e0c8cf

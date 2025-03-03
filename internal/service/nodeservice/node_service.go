@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 	api "tee-node/api/types"
-	"tee-node/config"
 	"tee-node/internal/attestation"
+	"tee-node/internal/config"
 	"tee-node/internal/node"
 	"tee-node/internal/policy"
 

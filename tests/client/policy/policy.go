@@ -3,10 +3,10 @@ package policy
 import (
 	"context"
 	"encoding/hex"
-	"tee-node/internal/policy"
 
 	api "tee-node/api/types"
 	pd "tee-node/internal/policy"
+	testutils "tee-node/tests"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -60,7 +60,7 @@ func init() {
 }
 
 // FetchPolicyHistory extracts all the data involving policies from the database
-func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB) ([]*relay.RelaySigningPolicyInitialized, map[string][]*policy.Signature, error) {
+func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB) ([]*relay.RelaySigningPolicyInitialized, map[string][]*PolicySignature, error) {
 	logsParams := database.LogsParams{
 		Address: params.RelayContractAddress,
 		Topic0:  signingPolicyInitializedEventSel,
@@ -88,7 +88,7 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 		return nil, nil, err
 	}
 
-	hashToSignatures := make(map[string][]*policy.Signature)
+	hashToSignatures := make(map[string][]*PolicySignature)
 	for _, tx := range txs {
 		inputBytes, err := hex.DecodeString(tx.Input)
 		if err != nil {
@@ -113,10 +113,10 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 		if err != nil {
 			return nil, nil, err
 		}
-		sig := policy.Signature{Sig: sigBytes, PubKey: pubKeyBytes}
+		sig := PolicySignature{Sig: sigBytes, PubKey: pubKeyBytes}
 
 		if _, ok := hashToSignatures[newSigningPolicyHash]; !ok {
-			hashToSignatures[newSigningPolicyHash] = make([]*policy.Signature, 0)
+			hashToSignatures[newSigningPolicyHash] = make([]*PolicySignature, 0)
 		}
 		hashToSignatures[newSigningPolicyHash] = append(hashToSignatures[newSigningPolicyHash], &sig)
 	}
@@ -132,8 +132,13 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 	return policies, hashToSignatures, nil
 }
 
-func CreateSigningRequest(policies []*relay.RelaySigningPolicyInitialized, signatures map[string][]*policy.Signature) (*api.InitializePolicyRequest, error) {
-	policyRequests := []*api.SignNewPolicyRequest{}
+type PolicySignature struct {
+	Sig    []byte
+	PubKey []byte
+}
+
+func CreateSigningRequest(policies []*relay.RelaySigningPolicyInitialized, signatures map[string][]*PolicySignature) (*api.InitializePolicyRequest, error) {
+	policyRequests := []api.MultiSignedPolicy{}
 
 	// Replay policy signing from the second policy onwards
 	for _, policy := range policies[1:] {
@@ -151,7 +156,7 @@ func CreateSigningRequest(policies []*relay.RelaySigningPolicyInitialized, signa
 				return nil, err
 			}
 
-			weight := pd.GetSignerWeight(pubKey, policyDecoded)
+			weight := testutils.GetSignerWeight(pubKey, policyDecoded)
 			if weight == 0 {
 				continue
 			}
@@ -166,12 +171,12 @@ func CreateSigningRequest(policies []*relay.RelaySigningPolicyInitialized, signa
 			policySignatureRequests = append(policySignatureRequests, &mes)
 		}
 
-		signNewPolicyRequest := api.SignNewPolicyRequest{
-			PolicyBytes:             policy.SigningPolicyBytes,
-			PolicySignatureMessages: policySignatureRequests,
+		signNewPolicyRequest := api.MultiSignedPolicy{
+			PolicyBytes: policy.SigningPolicyBytes,
+			Signatures:  policySignatureRequests,
 		}
 
-		policyRequests = append(policyRequests, &signNewPolicyRequest)
+		policyRequests = append(policyRequests, signNewPolicyRequest)
 	}
 	req := &api.InitializePolicyRequest{
 		InitialPolicyBytes: policies[0].SigningPolicyBytes,

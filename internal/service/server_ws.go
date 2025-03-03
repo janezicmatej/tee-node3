@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
-	"tee-node/internal/service/walletsservice"
+	"tee-node/internal/service/instructionservice/walletsservice"
 	"time"
 
 	"github.com/flare-foundation/go-flare-common/pkg/logger"

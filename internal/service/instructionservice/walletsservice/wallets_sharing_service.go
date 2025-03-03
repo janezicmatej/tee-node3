@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"tee-node/config"
 	"tee-node/internal/attestation"
+	"tee-node/internal/config"
 	"tee-node/internal/node"
 	"tee-node/internal/wallets"
 
@@ -34,7 +34,12 @@ type AttestationResponse struct {
 }
 
 func SendShare(conn *websocket.Conn, share *wallets.WalletShare, outNodeId, pubKey string) error {
+
+	fmt.Printf("1.0")
+
 	myNode := node.GetNodeId()
+
+	fmt.Printf("1.1")
 
 	if config.Mode == 0 {
 		err := StartMutualAttestation(conn, myNode.Uuid, outNodeId)
@@ -43,10 +48,14 @@ func SendShare(conn *websocket.Conn, share *wallets.WalletShare, outNodeId, pubK
 		}
 	}
 
+	fmt.Printf("1.2")
+
 	shareBytes, err := json.Marshal(share)
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("1.3")
 
 	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
@@ -54,10 +63,14 @@ func SendShare(conn *websocket.Conn, share *wallets.WalletShare, outNodeId, pubK
 	}
 	pk := [32]byte(pubKeyBytes)
 
+	fmt.Printf("1.4")
+
 	encrypted, err := box.SealAnonymous(nil, shareBytes, &pk, rand.Reader)
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("1.5")
 
 	err = conn.WriteMessage(websocket.TextMessage, encrypted)
 	if err != nil {

@@ -24,9 +24,11 @@ mapfile -t addresses < tests/scripts/addresses.txt
 readonly MULTISIG_ACCOUNT="rGumsQrNYzwW4xDPMmC3qXCJ5XqqsDBkat"  
 
 declare -a payment_hashes=()  
+declare -a instruction_ids=()
 declare -a accounts=()  
 declare -a signatures=()  
 declare -a public_keys=()  
+
 
 # Run initial policy simulate for each client config  
 for i in "${!client_configs[@]}"; do  
@@ -51,24 +53,23 @@ for i in "${!client_configs[@]}"; do
 
     payment_hashes+=("$PAYMENT_HASH")
 
+
+    instruction_id=$(shuf -i 1-1000000 -n 1)
+    instruction_ids+=("$instruction_id")
+    
+    
     for signer_idx in {0..1}; do  
-        res=$(go run tests/client/cmd/main.go --call sign_payment --arg1 "$signer_idx" --arg2="foo" --arg3 $PAYMENT_HASH --config "${client_configs[$i]}")
+        res=$(go run tests/client/cmd/main.go --call sign_payment --arg1 "$signer_idx" --arg2="foo" --arg3 $PAYMENT_HASH --arg4 $instruction_id --config "${client_configs[$i]}")
     done  
 
-    # Capture the account info
-    command_output=$(go run tests/client/cmd/main.go --call get_payment_signature --arg1="foo" --arg2 $PAYMENT_HASH --config "${client_configs[$i]}")  
 
-    
+    # Capture the account info
+    command_output=$(go run tests/client/cmd/main.go --call get_payment_signature --arg1 $instruction_id --config "${client_configs[$i]}")  
 
     # Extract Account Info
     account=$(echo "$command_output" | grep -o "Account [^,]*" | cut -d' ' -f2)  
     txn_signature=$(echo "$command_output" | grep -o "TxnSignature [^,]*" | cut -d' ' -f2) 
     public_key=$(echo "$command_output" | grep -o "PublicKey [^,]*" | cut -d' ' -f2)  
-
-
-    priv_key=$(echo "$command_output" | grep -o "PrivKey: [^,]*" | cut -d' ' -f2)  
-    echo "Private Key: $priv_key"
-
 
     accounts+=("$account")
     signatures+=("$txn_signature")
@@ -82,12 +83,13 @@ done
     for i in "${!payment_hashes[@]}"; do  
         echo -e "\nEntry $((i+1)):"  
         echo "Payment Hash: ${payment_hashes[$i]}"  
+        echo "Instruction ID: ${instruction_ids[$i]}"
         echo "Account: ${accounts[$i]}"  
         echo "TxnSignature: ${signatures[$i]}"  
         echo "PublicKey: ${public_keys[$i]}"  
         echo "----------------------------------------"  
     done  
-} > tests/scripts/signatures.txt  
+} > tests/scripts/xrp/signatures.txt  
 
 # Write to file with JSON formatting  
 {   
@@ -95,6 +97,7 @@ done
     for i in "${!payment_hashes[@]}"; do  
         echo "{"  
         echo "    \"payment_hash\": \"${payment_hashes[$i]}\","  
+        echo "    \"instruction_id\": \"${instruction_ids[$i]}\","
         echo "    \"account\": \"${accounts[$i]}\","  
         echo "    \"signature\": \"${signatures[$i]}\","  
         echo "    \"public_key\": \"${public_keys[$i]}\""  
@@ -102,4 +105,4 @@ done
         [[ $i -lt $((${#payment_hashes[@]}-1)) ]] && echo ","  
     done  
     echo "]"
-} > tests/scripts/signatures.json  
+} > tests/scripts/xrp/signatures.json  

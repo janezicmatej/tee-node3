@@ -117,7 +117,6 @@ func GetAccountFromAddress(address string) (*xrputils.Account, error) {
 }
 
 
-
 // Helper function to prepend prefix and append suffix
 func addPrefixAndSuffix(data []byte, prefix []byte, suffix []byte) []byte {
 	// Prepend the prefix and append the suffix to the data

@@ -87,12 +87,6 @@ func EncodeSigningPolicy(policy *SigningPolicy) ([]byte, error) {
 	return result, nil
 }
 
-// Helper function to convert the byte slice to hex string if needed
-func EncodeToHex(bytes []byte) string {
-
-	return "0x" + hex.EncodeToString(bytes)
-}
-
 func decodeSigningPolicyPrefix(data []byte) (*SigningPolicyPrefix, error) {
 	if len(data) < 64 {
 		return nil, errors.New("insufficient data length")
