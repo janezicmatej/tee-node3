@@ -2,7 +2,7 @@ package wallets
 
 import (
 	"crypto/ecdsa"
-	"fmt"
+	"sync"
 	"tee-node/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,16 +10,34 @@ import (
 	"github.com/pkg/errors"
 )
 
-var wallets map[string]*Wallet = make(map[string]*Wallet)
+var walletsStorage = InitWalletsStorage()
 
+// Wallet is a struct carrying the private key of particular wallet. It
+// should never be modified, after being created. Todo: check this
 type Wallet struct {
-	Name       string
+	WalletId   string
+	KeyId      string
 	PrivateKey *ecdsa.PrivateKey
 	Address    common.Address
 	XrpAddress string
 }
+type WalletsStorage struct {
+	// walletId to ShareId to WalletShare
+	Storage map[WalletKeyIdPair]*Wallet
 
-func CreateNewWallet(name string) error {
+	sync.Mutex
+}
+
+type WalletKeyIdPair struct {
+	WalletId string
+	KeyId    string
+}
+
+func InitWalletsStorage() WalletsStorage {
+	return WalletsStorage{Storage: make(map[WalletKeyIdPair]*Wallet)}
+}
+
+func CreateNewWallet(idPair WalletKeyIdPair) error {
 	sk, err := utils.GenerateEthereumPrivateKey()
 	if err != nil {
 		return err
@@ -31,14 +49,19 @@ func CreateNewWallet(name string) error {
 		return err
 	}
 
-	newWallet := Wallet{Name: name, PrivateKey: sk, Address: crypto.PubkeyToAddress(sk.PublicKey), XrpAddress: xrpAddress}
-	wallets[name] = &newWallet
+	newWallet := Wallet{WalletId: idPair.WalletId, KeyId: idPair.KeyId, PrivateKey: sk, Address: crypto.PubkeyToAddress(sk.PublicKey), XrpAddress: xrpAddress}
+	walletsStorage.Lock()
+	walletsStorage.Storage[idPair] = &newWallet
+	walletsStorage.Unlock()
 
 	return nil
 }
 
-func GetXrpAddress(name string) (string, error) {
-	wallet, ok := wallets[name]
+func GetXrpAddress(idPair WalletKeyIdPair) (string, error) {
+	walletsStorage.Lock()
+	wallet, ok := walletsStorage.Storage[idPair]
+	walletsStorage.Unlock()
+
 	if !ok {
 		return "", errors.New("wallet non-existent")
 	}
@@ -46,8 +69,10 @@ func GetXrpAddress(name string) (string, error) {
 	return wallet.XrpAddress, nil
 }
 
-func GetEthAddress(name string) (string, error) {
-	wallet, ok := wallets[name]
+func GetEthAddress(idPair WalletKeyIdPair) (string, error) {
+	walletsStorage.Lock()
+	wallet, ok := walletsStorage.Storage[idPair]
+	walletsStorage.Unlock()
 	if !ok {
 		return "", errors.New("wallet non-existent")
 	}
@@ -55,8 +80,10 @@ func GetEthAddress(name string) (string, error) {
 	return wallet.Address.Hex(), nil
 }
 
-func GetPublicKey(name string) (*ecdsa.PublicKey, error) {
-	wallet, ok := wallets[name]
+func GetPublicKey(idPair WalletKeyIdPair) (*ecdsa.PublicKey, error) {
+	walletsStorage.Lock()
+	wallet, ok := walletsStorage.Storage[idPair]
+	walletsStorage.Unlock()
 	if !ok {
 		return nil, errors.New("wallet non-existent")
 	}
@@ -65,18 +92,24 @@ func GetPublicKey(name string) (*ecdsa.PublicKey, error) {
 }
 
 func AddWallet(wallet *Wallet) error {
-	wallets[wallet.Name] = wallet
+	walletsStorage.Lock()
+	walletsStorage.Storage[WalletKeyIdPair{WalletId: wallet.WalletId, KeyId: wallet.KeyId}] = wallet
+	walletsStorage.Unlock()
 
 	return nil
 }
 
-func RemoveWallet(walletName string) {
-	fmt.Printf("Removing wallet %s\n", walletName)
-	delete(wallets, walletName)
+func RemoveWallet(idPair WalletKeyIdPair) {
+	walletsStorage.Lock()
+	delete(walletsStorage.Storage, idPair)
+	walletsStorage.Unlock()
+
 }
 
-func GetWallet(name string) (*Wallet, error) {
-	wallet, ok := wallets[name]
+func GetWallet(idPair WalletKeyIdPair) (*Wallet, error) {
+	walletsStorage.Lock()
+	wallet, ok := walletsStorage.Storage[idPair]
+	walletsStorage.Unlock()
 	if !ok {
 		return nil, errors.New("wallet non-existent")
 	}
@@ -84,12 +117,17 @@ func GetWallet(name string) (*Wallet, error) {
 	return wallet, nil
 }
 
-func WalletExists(name string) bool {
-	_, ok := wallets[name]
+func WalletExists(idPair WalletKeyIdPair) bool {
+	walletsStorage.Lock()
+	_, ok := walletsStorage.Storage[idPair]
+	walletsStorage.Unlock()
+
 	return ok
 }
 
 // Note: This is useful for tests, but it would also be useful for upgrades, where a TEE get's shutdown.
 func DestroyState() {
-	wallets = make(map[string]*Wallet)
+	walletsStorage.Lock()
+	walletsStorage.Storage = make(map[WalletKeyIdPair]*Wallet)
+	walletsStorage.Unlock()
 }

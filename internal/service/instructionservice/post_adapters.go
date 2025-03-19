@@ -1,7 +1,8 @@
 package instructionservice
 
 import (
-	api "tee-node/api/types"
+	"tee-node/internal/requests"
+	"tee-node/internal/service/instructionservice/policyservice"
 	"tee-node/internal/service/instructionservice/signingservice"
 	"tee-node/internal/service/instructionservice/walletsservice"
 
@@ -12,8 +13,8 @@ import (
 // * ----- REG OpType ----- * //
 
 // TODO: Implement this service and APIs
-func handleRegPostRequest(instructionData *api.InstructionData) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleRegPostRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 	case "AVAILABILITY_CHECK":
 		return nil, status.Error(codes.Unimplemented, "REG AVAILABILITY_CHECK command not implemented yet")
 
@@ -26,34 +27,43 @@ func handleRegPostRequest(instructionData *api.InstructionData) ([]byte, error) 
 	default:
 		return nil, status.Error(codes.Unknown, "Unknown OpCommand for WALLET OpType")
 	}
+}
 
+func handlePolicyPostRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
+	case "UPDATE_POLICY":
+		return []byte{}, policyservice.UpdatePolicy(requestCounter.Request)
+
+	default:
+		return nil, status.Error(codes.Unknown, "Unknown OpCommand for WALLET OpType")
+	}
 }
 
 // * ----- WALLET OpType ----- * //
 
-func handleWalletPostRequest(instructionData *api.InstructionData, signatures [][]byte) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleWalletPostRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 
 	case "KEY_GENERATE":
-		return []byte{}, walletsservice.NewWallet(instructionData)
+		return []byte{}, walletsservice.NewWallet(requestCounter.Request)
 
 	case "KEY_DELETE":
-		return []byte{}, walletsservice.DeleteWallet(instructionData)
+		return []byte{}, walletsservice.DeleteWallet(requestCounter.Request)
 
 	case "KEY_MACHINE_BACKUP":
-		return []byte{}, walletsservice.SplitWallet(instructionData, signatures)
+		return []byte{}, walletsservice.SplitWallet(requestCounter.Request, requestCounter.Signatures())
 
 	case "KEY_MACHINE_RESTORE":
-		return []byte{}, walletsservice.RecoverWallet(instructionData, signatures)
+		return []byte{}, walletsservice.RecoverWallet(requestCounter.Request, requestCounter.Signatures())
 
 	case "KEY_MACHINE_BACKUP_REMOVE":
-		return walletsservice.KeyMachineBackupRemove(instructionData)
+		return walletsservice.KeyMachineBackupRemove(requestCounter.Request)
 
 	case "KEY_CUSTODIAN_BACKUP":
-		return walletsservice.KeyCustodianBackup(instructionData)
+		return walletsservice.KeyCustodianBackup(requestCounter.Request)
 
 	case "KEY_CUSTODIAN_RESTORE":
-		return walletsservice.KeyCustodianRestore(instructionData)
+		return walletsservice.KeyCustodianRestore(requestCounter.Request)
 
 	default:
 		return nil, status.Error(codes.Unknown, "Unknown OpCommand for WALLET OpType")
@@ -64,22 +74,22 @@ func handleWalletPostRequest(instructionData *api.InstructionData, signatures []
 // * ----- XRP OpType ----- * //
 
 // TODO: Implement this service and APIs
-func handleXrpPostRequest(instructionData *api.InstructionData) ([]byte, error) {
+func handleXrpPostRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
 
-	switch instructionData.OpCommand {
+	switch requestCounter.Request.OpCommand {
 	case "PAY":
-		return signingservice.SignPaymentTransaction(instructionData)
+		return signingservice.SignPaymentTransaction(requestCounter.Request)
 
 	case "REISSUE":
-		return signingservice.XrpReissue(instructionData)
+		return signingservice.XrpReissue(requestCounter.Request)
 
 	default:
 		return nil, status.Error(codes.Unknown, "Unknown OpCommand for XRP OpType")
 	}
 }
 
-func handleBtcPostRequest(instructionData *api.InstructionData) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleBtcPostRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 	case "PAY":
 		return nil, status.Error(codes.Unimplemented, "BTC PAY command not implemented yet")
 
@@ -92,8 +102,8 @@ func handleBtcPostRequest(instructionData *api.InstructionData) ([]byte, error) 
 	}
 }
 
-func handleFdcPostRequest(instructionData *api.InstructionData) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleFdcPostRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 	case "PROVE":
 		return nil, status.Error(codes.Unimplemented, "FDC PROVE command not implemented yet")
 

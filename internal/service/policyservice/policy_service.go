@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"tee-node/internal/attestation"
 	"tee-node/internal/policy"
-	"tee-node/internal/requests"
 
 	api "tee-node/api/types"
 
@@ -28,49 +27,11 @@ func (s *Service) InitializePolicy(ctx context.Context, req *api.InitializePolic
 	default:
 	}
 
-	err := InitializePolicyInternal(req)
+	err := policy.InitializePolicyRequest(req.InitialPolicyBytes, req.NewPolicyRequests)
 	if err != nil {
 		return nil, err
 	}
 	return &api.InitializePolicyResponse{}, nil
-}
-
-// SignNewPolicy handles the SignNewPolicy request
-func (s *Service) SignNewPolicy(ctx context.Context, req *api.SignNewPolicyRequest) (*api.SignNewPolicyResponse, error) {
-	select {
-	case <-ctx.Done():
-		return nil, rpc.ErrClientQuit
-	default:
-	}
-
-	signPolicyRequest := policy.NewSignPaymentRequest(req.PolicyBytes)
-
-	requestCounter, thresholdReached, err := requests.ProcessRequest(signPolicyRequest, req.Signature.Signature)
-	if err != nil {
-		return nil, err
-	}
-
-	if thresholdReached && !requestCounter.Done {
-		err = policy.SetNewPolicyInternal(req)
-		if err != nil {
-			return nil, err
-		}
-
-		requestCounter.Done = true
-	}
-
-	// Get the attestation token
-	nonces := []string{req.Challenge, requestCounter.Request.Identifier()}
-	tokenBytes, err := attestation.GetGoogleAttestationToken(nonces, attestation.OIDCTokenType)
-	if err != nil {
-		return nil, err
-	}
-
-	return &api.SignNewPolicyResponse{
-		ActivePolicy:     hex.EncodeToString(policy.ActiveSigningPolicyHash),
-		ThresholdReached: thresholdReached,
-		Token:            string(tokenBytes),
-	}, nil
 }
 
 // GetActivePolicy handles the GetActivePolicy request

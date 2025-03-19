@@ -10,23 +10,25 @@ import (
 )
 
 type WalletShare struct {
-	WalletName string
-	Address    common.Address
-	Share      utils.ShamirShare
-	Threshold  int
-	NumShares  int
+	BackupId  string
+	WalletId  string
+	KeyId     string
+	Address   common.Address
+	Share     utils.ShamirShare
+	Threshold int
+	NumShares int
 }
 
-func SplitWalletByName(name string, numShares, threshold int) ([]*WalletShare, error) {
-	wallet, ok := wallets[name]
-	if !ok {
-		return nil, errors.New("wallet non-existent")
+func SplitWalletById(idTriple BackupWalletKeyIdTriple, numShares, threshold int) ([]*WalletShare, error) {
+	wallet, err := GetWallet(WalletKeyIdPair{WalletId: idTriple.WalletId, KeyId: idTriple.KeyId})
+	if err != nil {
+		return nil, err
 	}
 
-	return SplitWallet(wallet, numShares, threshold)
+	return SplitWallet(wallet, idTriple.BackupId, numShares, threshold)
 }
 
-func SplitWallet(wallet *Wallet, numShares, threshold int) ([]*WalletShare, error) {
+func SplitWallet(wallet *Wallet, backupId string, numShares, threshold int) ([]*WalletShare, error) {
 	shares, err := utils.SplitToShamirShares(wallet.PrivateKey.D, numShares, threshold)
 	if err != nil {
 		return nil, err
@@ -35,20 +37,27 @@ func SplitWallet(wallet *Wallet, numShares, threshold int) ([]*WalletShare, erro
 	splits := make([]*WalletShare, numShares)
 
 	for i, share := range shares {
-		splits[i] = &WalletShare{WalletName: wallet.Name, Address: wallet.Address, Share: share, Threshold: threshold, NumShares: numShares}
+		splits[i] = &WalletShare{WalletId: wallet.WalletId,
+			KeyId:     wallet.KeyId,
+			BackupId:  backupId,
+			Address:   wallet.Address,
+			Share:     share,
+			Threshold: threshold,
+			NumShares: numShares,
+		}
 	}
 
 	return splits, nil
 }
 
-func JointWallet(splits []*WalletShare, name string, address common.Address, threshold int) (*Wallet, error) {
+func JointWallet(splits []*WalletShare, idTriple BackupWalletKeyIdTriple, address common.Address, threshold int) (*Wallet, error) {
 	if len(splits) < threshold {
 		return nil, errors.New("not enough splits")
 	}
 
 	candidatesIndexes := make([]int, 0)
 	for i, split := range splits {
-		if split.Address.Hex() == address.Hex() && split.WalletName == name && split.Threshold == threshold {
+		if split.Address.Hex() == address.Hex() && split.WalletId == idTriple.WalletId && split.KeyId == idTriple.KeyId && split.BackupId == idTriple.BackupId && split.Threshold == threshold {
 			candidatesIndexes = append(candidatesIndexes, i)
 		}
 	}
@@ -74,7 +83,7 @@ func JointWallet(splits []*WalletShare, name string, address common.Address, thr
 			continue
 		}
 
-		return &Wallet{Name: name, PrivateKey: privateKey, Address: address}, nil
+		return &Wallet{WalletId: idTriple.WalletId, KeyId: idTriple.KeyId, PrivateKey: privateKey, Address: address}, nil
 	}
 
 	return nil, errors.New("unable to join shares")

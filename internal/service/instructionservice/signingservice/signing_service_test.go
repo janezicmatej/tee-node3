@@ -18,7 +18,8 @@ import (
 	api "tee-node/api/types"
 )
 
-const mockWallet = "wallet1"
+const mockWalletId = "wallet1"
+const mockKeyId = "key1"
 
 // Send enough signatures for the payment hash, to pass the threshold.
 func TestSendManyPaymentSignatures(t *testing.T) {
@@ -30,14 +31,14 @@ func TestSendManyPaymentSignatures(t *testing.T) {
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
-	testutils.CreateMockWallet(t, myNodeId.Id, mockWallet, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
+	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
 
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
 
 	instructionIdBytes, _ := utils.GenerateRandomBytes(32)
 	instruction, err := testutils.BuildMockInstruction("XRP",
 		"PAY",
-		api.SignPaymentRequest{WalletName: mockWallet, PaymentHash: paymentHash},
+		api.SignPaymentRequest{WalletId: mockWalletId, KeyId: mockKeyId, PaymentHash: paymentHash},
 		privKeys[0],
 		"1234",
 		hex.EncodeToString(instructionIdBytes),
@@ -45,7 +46,7 @@ func TestSendManyPaymentSignatures(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	response, err := SignPaymentTransaction(instruction.Data)
+	response, err := SignPaymentTransaction(&instruction.Data.InstructionDataBase)
 	if err != nil {
 		t.Fatalf("Failed to sign the payment transaction: %v", err)
 	}
@@ -64,7 +65,7 @@ func TestGetSignatureApi(t *testing.T) {
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
-	testutils.CreateMockWallet(t, myNodeId.Id, mockWallet, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
+	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
 
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
 
@@ -75,7 +76,7 @@ func TestGetSignatureApi(t *testing.T) {
 
 	instruction, err := testutils.BuildMockInstruction("XRP",
 		"PAY",
-		api.SignPaymentRequest{WalletName: mockWallet, PaymentHash: paymentHash},
+		api.SignPaymentRequest{WalletId: mockWalletId, KeyId: mockKeyId, PaymentHash: paymentHash},
 		privKeys[0],
 		"1234",
 		hex.EncodeToString(instructionIdBytes),
@@ -83,18 +84,18 @@ func TestGetSignatureApi(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	signature, err := SignPaymentTransaction(instruction.Data)
+	signature, err := SignPaymentTransaction(&instruction.Data.InstructionDataBase)
 	if err != nil {
 		t.Fatalf("Failed to sign the payment transaction: %v", err)
 	}
 
 	// Get the signature after the threshold was reached
-	resp, err := GetPaymentSignature(instruction.Data, signature)
+	resp, err := GetPaymentSignature(&instruction.Data.InstructionDataBase, signature)
 	require.NoError(t, err)
 
 	require.Equal(t, paymentHash, resp.PaymentHash)
 
-	valid := verifyPaymentRequestSignature(t, hashBytes, resp.TxnSignature, mockWallet)
+	valid := verifyPaymentRequestSignature(t, hashBytes, resp.TxnSignature, mockWalletId, mockKeyId)
 	if !valid {
 		t.Fatalf("The signature is not valid")
 	}
@@ -118,9 +119,8 @@ func TestSigning(t *testing.T) {
 
 // * —————————————————————————————————————————————————————————————————————————————————————————— * //
 
-func verifyPaymentRequestSignature(t *testing.T, paymentHash []byte, txnSignature []byte, walletName string) bool {
-
-	pubKey, err := wallets.GetPublicKey(walletName)
+func verifyPaymentRequestSignature(t *testing.T, paymentHash []byte, txnSignature []byte, walletId, keyId string) bool {
+	pubKey, err := wallets.GetPublicKey(wallets.WalletKeyIdPair{WalletId: walletId, KeyId: keyId})
 	require.NoError(t, err)
 
 	valid, err := utils.XrpVerifySig(paymentHash, txnSignature, pubKey)

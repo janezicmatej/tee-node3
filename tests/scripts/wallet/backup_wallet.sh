@@ -43,7 +43,7 @@ node_id=$(echo "$node_info_json" | jq -r --argjson idx1 0 '.[$idx1] | .tee_id')
 # backup wallet
 instruction_id=$(shuf -i 1-1000000 -n 1)
 for j in {0..2}; do   
-    go run tests/client/cmd/main.go --call split_wallet --provider $j --walletname foo --instructionid "$instruction_id" --arg1 "$backup_node_infos" --teeid $node_id --rewardepochid 5 --config tests/configs/config_client.toml   
+    go run tests/client/cmd/main.go --call split_wallet --provider $j --walletid foo --keyid bar --backupid baz --instructionid "$instruction_id" --arg1 "$backup_node_infos" --teeid $node_id --rewardepochid 5 --config tests/configs/config_client.toml   
 done
 
 

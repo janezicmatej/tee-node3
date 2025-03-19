@@ -8,10 +8,11 @@ import "encoding/json"
 // * Requests * //
 
 type NewWalletRequest struct {
-	Name string
+	WalletId string
+	KeyId    string
 }
 
-func ParseNewWalletRequest(instructionData *InstructionData) (NewWalletRequest, error) {
+func ParseNewWalletRequest(instructionData *InstructionDataBase) (NewWalletRequest, error) {
 
 	// TODO: I am not sure how this OriginalMessage is going to be encoded/decoded (abi.EncodePacked?)
 	var newWalletRequest NewWalletRequest
@@ -26,10 +27,11 @@ func ParseNewWalletRequest(instructionData *InstructionData) (NewWalletRequest, 
 // ----- ----- ----- ------
 
 type DeleteWalletRequest struct {
-	Name string
+	WalletId string
+	KeyId    string
 }
 
-func NewDeleteWalletRequest(instructionData *InstructionData) (DeleteWalletRequest, error) {
+func NewDeleteWalletRequest(instructionData *InstructionDataBase) (DeleteWalletRequest, error) {
 
 	// TODO: Decode properly
 	var delWalletRequest DeleteWalletRequest
@@ -42,14 +44,16 @@ func NewDeleteWalletRequest(instructionData *InstructionData) (DeleteWalletReque
 }
 
 type SplitWalletRequest struct {
-	Name       string
+	BackupId   string
+	WalletId   string
+	KeyId      string
 	TeeIds     []string
 	Hosts      []string
 	PublicKeys []string
 	Threshold  int64
 }
 
-func NewSplitWalletRequest(instructionData *InstructionData) (SplitWalletRequest, error) {
+func NewSplitWalletRequest(instructionData *InstructionDataBase) (SplitWalletRequest, error) {
 
 	// TODO: Decode properly
 	var splitWalletRequest SplitWalletRequest
@@ -62,7 +66,9 @@ func NewSplitWalletRequest(instructionData *InstructionData) (SplitWalletRequest
 }
 
 type RecoverWalletRequest struct {
-	Name      string
+	BackupId  string
+	WalletId  string
+	KeyId     string
 	TeeIds    []string
 	Hosts     []string
 	ShareIds  []string
@@ -71,7 +77,7 @@ type RecoverWalletRequest struct {
 	Threshold int64
 }
 
-func NewRecoverWalletRequest(instructionData *InstructionData) (RecoverWalletRequest, error) {
+func NewRecoverWalletRequest(instructionData *InstructionDataBase) (RecoverWalletRequest, error) {
 
 	// TODO: Decode properly
 	var recoverWalletRequest RecoverWalletRequest
@@ -88,7 +94,8 @@ func NewRecoverWalletRequest(instructionData *InstructionData) (RecoverWalletReq
 // * ——————————————— GET Requests ——————————————— * //
 
 type WalletInfoRequest struct {
-	Name      string
+	WalletId  string
+	KeyId     string
 	Challenge string
 }
 

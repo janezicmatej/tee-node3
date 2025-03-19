@@ -8,11 +8,12 @@ import "encoding/json"
 // * Requests * //
 
 type SignPaymentRequest struct {
-	WalletName  string
+	WalletId    string
+	KeyId       string
 	PaymentHash string
 }
 
-func ParseSignPaymentRequest(instructionData *InstructionData) (SignPaymentRequest, error) {
+func ParseSignPaymentRequest(instructionData *InstructionDataBase) (SignPaymentRequest, error) {
 	// TODO: Decode properly
 	var signPaymentRequest SignPaymentRequest
 	err := json.Unmarshal(instructionData.OriginalMessage, &signPaymentRequest)

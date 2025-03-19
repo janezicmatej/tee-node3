@@ -24,7 +24,7 @@ pub_keys=()
 for config in "${client_configs[@]}"; do  
     go run tests/client/cmd/main.go --call initial_policy_simulate --config "$config"  
 
-    go run tests/client/cmd/main.go --call node_attestation --walletname foo --config tests/configs/config_client.toml
+    go run tests/client/cmd/main.go --call node_attestation --config tests/configs/config_client.toml
 
     command_output=$(go run tests/client/cmd/main.go \
         --call node_attestation \

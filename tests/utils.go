@@ -66,12 +66,9 @@ func GenerateRandomMultiSignedPolicyArray(epochId uint32, randSeed int64, voters
 func BuildMultiSignedPolicy(policyBytes []byte, voterPrivKeys []*ecdsa.PrivateKey) api.MultiSignedPolicy {
 	PolicySignatureMessages := []*api.SignatureMessage{}
 
-	policySignReq := policy.NewSignPaymentRequest(policyBytes)
-
 	for _, voterPrivKey := range voterPrivKeys {
-
 		// sig, err := policy.SignNewSigningPolicy(policy.SigningPolicyHash(policyBytes), voterPrivKeys[i])
-		sig, err := requests.Sign(policySignReq, voterPrivKey)
+		sig, err := utils.Sign(policy.SigningPolicyHash(policyBytes), voterPrivKey)
 		if err != nil {
 			panic(err)
 		}

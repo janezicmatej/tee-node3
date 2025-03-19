@@ -17,13 +17,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func NewWallet(instructionData *api.InstructionData) error {
+func NewWallet(instructionData *api.InstructionDataBase) error {
 	newWalletRequest, err := api.ParseNewWalletRequest(instructionData)
 	if err != nil {
 		return err
 	}
 
-	err = wallets.CreateNewWallet(newWalletRequest.Name)
+	err = wallets.CreateNewWallet(wallets.WalletKeyIdPair{WalletId: newWalletRequest.WalletId, KeyId: newWalletRequest.KeyId})
 	if err != nil {
 		return err
 	}
@@ -31,25 +31,29 @@ func NewWallet(instructionData *api.InstructionData) error {
 	return nil
 }
 
-func DeleteWallet(instructionData *api.InstructionData) error {
+func DeleteWallet(instructionData *api.InstructionDataBase) error {
 	delWalletRequest, err := api.NewDeleteWalletRequest(instructionData)
 	if err != nil {
 		return err
 	}
 
-	wallets.RemoveWallet(delWalletRequest.Name)
+	wallets.RemoveWallet(wallets.WalletKeyIdPair{WalletId: delWalletRequest.WalletId, KeyId: delWalletRequest.KeyId})
 
 	return nil
 }
 
-func SplitWallet(instructionData *api.InstructionData, signatures [][]byte) error {
+func SplitWallet(instructionData *api.InstructionDataBase, signatures [][]byte) error {
 	splitWalletRequest, err := api.NewSplitWalletRequest(instructionData)
 	if err != nil {
 		return err
 	}
 	numShares := len(splitWalletRequest.TeeIds)
 
-	splits, err := wallets.SplitWalletByName(splitWalletRequest.Name, numShares, int(splitWalletRequest.Threshold))
+	splits, err := wallets.SplitWalletById(
+		wallets.BackupWalletKeyIdTriple{BackupId: splitWalletRequest.BackupId, WalletId: splitWalletRequest.WalletId, KeyId: splitWalletRequest.KeyId},
+		numShares,
+		int(splitWalletRequest.Threshold),
+	)
 	if err != nil {
 		return err
 	}
@@ -75,7 +79,7 @@ func SplitWallet(instructionData *api.InstructionData, signatures [][]byte) erro
 	return nil
 }
 
-func RecoverWallet(instructionData *api.InstructionData, signatures [][]byte) error {
+func RecoverWallet(instructionData *api.InstructionDataBase, signatures [][]byte) error {
 	recoverWalletRequest, err := api.NewRecoverWalletRequest(instructionData)
 	if err != nil {
 		return err
@@ -112,13 +116,16 @@ func RecoverWallet(instructionData *api.InstructionData, signatures [][]byte) er
 		}
 		splits = append(splits, share)
 
-		logger.Infof("obtained a share for wallet %s", recoverWalletRequest.Name)
+		logger.Infof("obtained a share for wallet %s", recoverWalletRequest.WalletId)
 
 		conn.Close()
 	}
 
 	address := common.HexToAddress(recoverWalletRequest.Address)
-	reconstructedWallet, err := wallets.JointWallet(splits, recoverWalletRequest.Name, address, int(recoverWalletRequest.Threshold))
+	reconstructedWallet, err := wallets.JointWallet(
+		splits,
+		wallets.BackupWalletKeyIdTriple{WalletId: recoverWalletRequest.WalletId, KeyId: recoverWalletRequest.KeyId, BackupId: recoverWalletRequest.BackupId},
+		address, int(recoverWalletRequest.Threshold))
 	if err != nil {
 		return err
 	}
@@ -130,28 +137,29 @@ func RecoverWallet(instructionData *api.InstructionData, signatures [][]byte) er
 	return nil
 }
 
-func KeyMachineBackupRemove(instructionData *api.InstructionData) ([]byte, error) {
+func KeyMachineBackupRemove(instructionData *api.InstructionDataBase) ([]byte, error) {
 	return nil, errors.New("WALLET KEY_MACHINE_BACKUP_REMOVE command not implemented yet")
 }
 
-func KeyCustodianBackup(instructionData *api.InstructionData) ([]byte, error) {
+func KeyCustodianBackup(instructionData *api.InstructionDataBase) ([]byte, error) {
 	return nil, errors.New("WALLET KEY_CUSTODIAN_BACKUP command not implemented yet")
 }
 
-func KeyCustodianRestore(instructionData *api.InstructionData) ([]byte, error) {
+func KeyCustodianRestore(instructionData *api.InstructionDataBase) ([]byte, error) {
 	return nil, errors.New("WALLET KEY_CUSTODIAN_RESTORE command not implemented yet")
 }
 
 // GETERS
 
 func WalletInfo(req *api.WalletInfoRequest) (*api.WalletInfoResponse, error) {
-	ethAddress, err := wallets.GetEthAddress(req.Name)
-	publicKey, err2 := wallets.GetPublicKey(req.Name)
+	walletKeyIdPair := wallets.WalletKeyIdPair{WalletId: req.WalletId, KeyId: req.KeyId}
+	ethAddress, err := wallets.GetEthAddress(walletKeyIdPair)
+	publicKey, err2 := wallets.GetPublicKey(walletKeyIdPair)
 	if err != nil || err2 != nil {
 		return nil, fmt.Errorf("wallet non-existent")
 	}
 
-	xrpAddress, err := wallets.GetXrpAddress(req.Name)
+	xrpAddress, err := wallets.GetXrpAddress(walletKeyIdPair)
 	sec1PubKey := hex.EncodeToString(utils.SerializeCompressed(publicKey))
 	if err != nil {
 		return nil, fmt.Errorf("wallet non-existent")

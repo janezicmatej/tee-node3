@@ -19,16 +19,23 @@ import (
 	"golang.org/x/crypto/nacl/box"
 )
 
-var BackupWallets = InitBackupWalletsStorage()
+var backupWalletsStorage = InitBackupWalletsStorage()
 
 type BackupWalletsStorage struct {
-	Storage map[string]map[string]WalletShare
+	// walletId to ShareId to WalletShare
+	Storage map[BackupWalletKeyIdTriple]map[string]WalletShare
 
 	sync.Mutex
 }
 
+type BackupWalletKeyIdTriple struct {
+	BackupId string
+	WalletId string
+	KeyId    string
+}
+
 func InitBackupWalletsStorage() BackupWalletsStorage {
-	return BackupWalletsStorage{Storage: make(map[string]map[string]WalletShare)}
+	return BackupWalletsStorage{Storage: make(map[BackupWalletKeyIdTriple]map[string]WalletShare)}
 }
 
 type AttestationRequest struct {
@@ -42,7 +49,7 @@ type AttestationResponse struct {
 }
 
 // todo: Add instruction and signatures check also by receiving nodes? at least code version of the receiving nodes?
-func SendShare(conn *websocket.Conn, share *WalletShare, outNodeId, pubKey string, instructionData *api.InstructionData, signatures [][]byte) error {
+func SendShare(conn *websocket.Conn, share *WalletShare, outNodeId, pubKey string, instructionData *api.InstructionDataBase, signatures [][]byte) error {
 	myNode := node.GetNodeId()
 
 	err := StartMutualAttestation(conn, myNode.Id, outNodeId)
@@ -71,7 +78,7 @@ func SendShare(conn *websocket.Conn, share *WalletShare, outNodeId, pubKey strin
 		return err
 	}
 
-	logger.Infof("sent a share for wallet %s", share.WalletName)
+	logger.Infof("sent a share for wallet %s", share.WalletId)
 
 	return err
 }
@@ -100,39 +107,38 @@ func GetShares(conn *websocket.Conn) error {
 		return err
 	}
 
-	BackupWallets.Lock()
-	if _, ok := BackupWallets.Storage[walletShare.WalletName]; !ok {
-		BackupWallets.Storage[walletShare.WalletName] = make(map[string]WalletShare)
+	backupIdTriple := BackupWalletKeyIdTriple{WalletId: walletShare.WalletId, KeyId: walletShare.KeyId, BackupId: walletShare.BackupId}
+
+	backupWalletsStorage.Lock()
+	if _, ok := backupWalletsStorage.Storage[backupIdTriple]; !ok {
+		backupWalletsStorage.Storage[backupIdTriple] = make(map[string]WalletShare)
 	}
-	BackupWallets.Storage[walletShare.WalletName][walletShare.Share.ID()] = walletShare
-	BackupWallets.Unlock()
-	logger.Infof("received a share for wallet %s, id %s", walletShare.WalletName, walletShare.Share.ID())
+	backupWalletsStorage.Storage[backupIdTriple][walletShare.Share.ID()] = walletShare
+	backupWalletsStorage.Unlock()
+	logger.Infof("received a share for wallet %s, id %s", walletShare.WalletId, walletShare.Share.ID())
 
 	return nil
 }
 
 type shareInfo struct {
 	I               int
-	InstructionData api.InstructionData
+	InstructionData api.InstructionDataBase
 	Signatures      [][]byte
 }
 
 func (s shareInfo) Check(myNodeId, outNodeId string) error {
-	requestCounter := requests.NewRequestCounter(s.InstructionData)
-	requestPolicy, err := requestCounter.GetRequestPolicy()
-	if err != nil {
-		return err
-	}
+	instructionData := &api.InstructionData{InstructionDataBase: s.InstructionData, AdditionalVariableMessage: []byte("")} // variable part is empty
 
+	requestCounter := requests.NewRequestCounter(instructionData)
 	for _, signature := range s.Signatures {
-		providerAddress, err := requests.CheckSignature(s.InstructionData, signature, requestPolicy)
+		providerAddress, err := requests.CheckSignature(instructionData, signature, requestCounter.RequestPolicy)
 		if err != nil {
 			return err
 		}
 		requestCounter.AddRequestSignature(providerAddress, signature)
 	}
 
-	thresholdReached := requestCounter.ThresholdReached(requestPolicy)
+	thresholdReached := requestCounter.ThresholdReached()
 	if !thresholdReached {
 		return errors.New("threshold not reached")
 	}
@@ -152,14 +158,14 @@ func (s shareInfo) Check(myNodeId, outNodeId string) error {
 	return nil
 }
 
-func (s shareInfo) Extract() (string, string, string) {
-	recoverWalletRequest, _ := api.NewRecoverWalletRequest(&s.InstructionData) // error already checked before
+func (s shareInfo) Extract() (BackupWalletKeyIdTriple, string, string) {
+	recoverWalletRequest, _ := api.NewRecoverWalletRequest(&s.InstructionData) // error is already checked before
 
-	return recoverWalletRequest.Name, recoverWalletRequest.ShareIds[s.I], recoverWalletRequest.PublicKey
-
+	return BackupWalletKeyIdTriple{BackupId: recoverWalletRequest.BackupId, WalletId: recoverWalletRequest.WalletId, KeyId: recoverWalletRequest.KeyId},
+		recoverWalletRequest.ShareIds[s.I], recoverWalletRequest.PublicKey
 }
 
-func RequestShare(conn *websocket.Conn, outNodeId string, i int, instructionData *api.InstructionData, signatures [][]byte) (*WalletShare, error) {
+func RequestShare(conn *websocket.Conn, outNodeId string, i int, instructionData *api.InstructionDataBase, signatures [][]byte) (*WalletShare, error) {
 	myNode := node.GetNodeId()
 
 	err := StartMutualAttestation(conn, myNode.Id, outNodeId)
@@ -214,20 +220,20 @@ func RecoverShare(conn *websocket.Conn) error {
 	if err != nil {
 		return err
 	}
-	walletName, shareId, pubKey := shareInfo.Extract()
+	backupIdTriple, shareId, pubKey := shareInfo.Extract()
 
-	BackupWallets.Lock()
-	walletShares, ok := BackupWallets.Storage[walletName]
+	backupWalletsStorage.Lock()
+	walletShares, ok := backupWalletsStorage.Storage[backupIdTriple]
 	if !ok {
-		BackupWallets.Unlock()
+		backupWalletsStorage.Unlock()
 		return errors.New("no backup share of wallet with given name")
 	}
 	walletShare, ok := walletShares[shareId]
 	if !ok {
-		BackupWallets.Unlock()
+		backupWalletsStorage.Unlock()
 		return errors.New("no backup share of wallet with given Id")
 	}
-	BackupWallets.Unlock()
+	backupWalletsStorage.Unlock()
 
 	shareBytes, err := json.Marshal(walletShare)
 	if err != nil {
@@ -249,7 +255,7 @@ func RecoverShare(conn *websocket.Conn) error {
 		return err
 	}
 
-	logger.Infof("provided a share for wallet %s", walletShare.WalletName)
+	logger.Infof("provided a share for wallet %s", walletShare.WalletId)
 
 	return nil
 }
