@@ -33,13 +33,13 @@ for config in "${client_configs[@]}"; do
 
     # Run new wallet commands  
     for i in {0..2}; do   
-        go run tests/client/cmd/main.go --call new_wallet --arg1 "$i" --arg2 foo --arg3 $instruction_id --arg4 $node_id --rewardepochid 5 --config "$config"  
+        go run tests/client/cmd/main.go --call new_wallet --provider $i --walletid qux --keyid "quux${j}" --instructionid $instruction_id --teeid $node_id --rewardepochid 5 --config "$config"  
     done  
 
     # # Run pub key command  
     XRP_ADDRESS=$(go run tests/client/cmd/main.go \
         --call wallet_info \
-        --arg1 foo \
+        --walletid qux --keyid "quux${j}" \
         --config "$config" \
         | awk -F"XrpAddress: " '{print $2}' | awk -F", " '{print $1}')  
 

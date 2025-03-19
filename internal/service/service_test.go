@@ -23,6 +23,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var walletId = "newWallet"
+var keyId = "newKey"
+var backupId = "backup1"
+
 func TestServiceEndToEnd(t *testing.T) {
 	err := node.InitNode()
 	if err != nil {
@@ -56,33 +60,32 @@ func TestServiceEndToEnd(t *testing.T) {
 	nodeId, pubKey := getNodeInfo(t, client, ctx)
 
 	// generate a new wallet
-	walletName := "newWallet"
-	createWallet(t, nodeId, walletName, client, providers, ctx)
+	createWallet(t, nodeId, walletId, keyId, client, providers, ctx)
 	// get address
-	address := getAddress(t, walletName, client, ctx)
+	address := getAddress(t, walletId, keyId, client, ctx)
 
 	// backup wallet to yourself
 	ids := []string{nodeId, nodeId}
 	backups := []string{"ws://localhost:50061", "ws://localhost:50061"}
 	pubKeys := []string{pubKey, pubKey}
 	threshold := len(backups)
-	backupWallet(t, nodeId, walletName, ids, backups, pubKeys, threshold, client, providers, ctx)
+	backupWallet(t, nodeId, walletId, keyId, backupId, ids, backups, pubKeys, threshold, client, providers, ctx)
 
 	// delete wallet
-	deleteWallet(t, nodeId, walletName, client, providers, ctx)
+	deleteWallet(t, nodeId, walletId, keyId, client, providers, ctx)
 
 	time.Sleep(time.Second)
 
 	// recover key
-	recoverWallet(t, nodeId, walletName, address, ids, backups, pubKey, threshold, client, providers, ctx)
+	recoverWallet(t, nodeId, walletId, keyId, backupId, address, ids, backups, pubKey, threshold, client, providers, ctx)
 
 	// get recovered address
-	recoveredAddress := getAddress(t, walletName, client, ctx)
+	recoveredAddress := getAddress(t, walletId, keyId, client, ctx)
 	require.Equal(t, address, recoveredAddress)
 
 	// sign transaction
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
-	instructionId := signTransaction(t, nodeId, walletName, paymentHash, client, providers, ctx)
+	instructionId := signTransaction(t, nodeId, walletId, keyId, paymentHash, client, providers, ctx)
 	getSignatureResult(t, instructionId, client, ctx)
 }
 
@@ -106,7 +109,7 @@ func initializePolicy(t *testing.T, numPolicies int, client *rpc.Client, provide
 	require.NoError(t, err, "could not initialize policy")
 }
 
-func createWallet(t *testing.T, nodeId, walletName string, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
+func createWallet(t *testing.T, nodeId, walletId, keyId string, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
 
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 
@@ -115,7 +118,7 @@ func createWallet(t *testing.T, nodeId, walletName string, client *rpc.Client, p
 
 		instruction, err := utils.BuildMockInstruction("WALLET",
 			"KEY_GENERATE",
-			api.NewWalletRequest{Name: walletName},
+			api.NewWalletRequest{WalletId: walletId, KeyId: keyId},
 			providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),
@@ -146,12 +149,12 @@ func getNodeInfo(t *testing.T, client *rpc.Client, ctx context.Context) (string,
 	return nodeResp.Data.Id, nodeResp.Data.EncryptionPublicKey
 }
 
-func getAddress(t *testing.T, walletName string, client *rpc.Client, ctx context.Context) string {
+func getAddress(t *testing.T, walletId, keyId string, client *rpc.Client, ctx context.Context) string {
 	instructionId, err := utilsserver.GenerateRandomBytes(32)
 	require.NoError(t, err)
 
 	var pubKeyResp api.WalletInfoResponse
-	err = client.CallContext(ctx, &pubKeyResp, "instructionservice_walletInfo", &api.WalletInfoRequest{Name: walletName, Challenge: hex.EncodeToString(instructionId)})
+	err = client.CallContext(ctx, &pubKeyResp, "instructionservice_walletInfo", &api.WalletInfoRequest{WalletId: walletId, KeyId: keyId, Challenge: hex.EncodeToString(instructionId)})
 	require.NoError(t, err, "could not obtain the address")
 
 	logger.Infof("ethAddress: %s, public key: %s, attestation token %s", pubKeyResp.EthAddress, pubKeyResp.EthPublicKey.X, pubKeyResp.Token)
@@ -159,14 +162,16 @@ func getAddress(t *testing.T, walletName string, client *rpc.Client, ctx context
 	return pubKeyResp.EthAddress
 }
 
-func backupWallet(t *testing.T, nodeId, walletName string, ids, backups, pubKeys []string, threshold int, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
+func backupWallet(t *testing.T, nodeId, walletId, keyId, backupId string, ids, backups, pubKeys []string, threshold int, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
 
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		providerPrivKey := providers.PrivKeys[i]
 
 		instruction, err := utils.BuildMockInstruction("WALLET", "KEY_MACHINE_BACKUP", api.SplitWalletRequest{
-			Name:       walletName,
+			WalletId:   walletId,
+			KeyId:      keyId,
+			BackupId:   backupId,
 			TeeIds:     ids,
 			Hosts:      backups,
 			PublicKeys: pubKeys,
@@ -193,14 +198,15 @@ func backupWallet(t *testing.T, nodeId, walletName string, ids, backups, pubKeys
 	}
 }
 
-func deleteWallet(t *testing.T, nodeId, walletName string, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
+func deleteWallet(t *testing.T, nodeId, walletId, keyId string, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
 
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		providerPrivKey := providers.PrivKeys[i]
 
 		instruction, err := utils.BuildMockInstruction("WALLET", "KEY_DELETE", api.DeleteWalletRequest{
-			Name: walletName,
+			WalletId: walletId,
+			KeyId:    keyId,
 		}, providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),
@@ -222,11 +228,11 @@ func deleteWallet(t *testing.T, nodeId, walletName string, client *rpc.Client, p
 	require.NoError(t, err)
 
 	var pubKeyResp api.WalletInfoResponse
-	err = client.CallContext(ctx, &pubKeyResp, "instructionservice_walletInfo", &api.WalletInfoRequest{Name: walletName, Challenge: hex.EncodeToString(nonceBytes)})
+	err = client.CallContext(ctx, &pubKeyResp, "instructionservice_walletInfo", &api.WalletInfoRequest{WalletId: walletId, KeyId: keyId, Challenge: hex.EncodeToString(nonceBytes)})
 	require.Error(t, err)
 }
 
-func recoverWallet(t *testing.T, nodeId, walletName string, address string, ids, backups []string, pubKey string, threshold int, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
+func recoverWallet(t *testing.T, nodeId, walletId, keyId, backupId string, address string, ids, backups []string, pubKey string, threshold int, client *rpc.Client, providers *utils.Providers, ctx context.Context) {
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		shareIds := make([]string, threshold)
@@ -237,7 +243,9 @@ func recoverWallet(t *testing.T, nodeId, walletName string, address string, ids,
 		providerPrivKey := providers.PrivKeys[i]
 
 		instruction, err := utils.BuildMockInstruction("WALLET", "KEY_MACHINE_RESTORE", api.RecoverWalletRequest{
-			Name:      walletName,
+			WalletId:  walletId,
+			KeyId:     keyId,
+			BackupId:  backupId,
 			TeeIds:    ids,
 			Hosts:     backups,
 			ShareIds:  shareIds,
@@ -266,14 +274,14 @@ func recoverWallet(t *testing.T, nodeId, walletName string, address string, ids,
 	}
 }
 
-func signTransaction(t *testing.T, nodeId, walletName, paymentHash string, client *rpc.Client, providers *utils.Providers, ctx context.Context) string {
+func signTransaction(t *testing.T, nodeId, walletId, keyId, paymentHash string, client *rpc.Client, providers *utils.Providers, ctx context.Context) string {
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		providerPrivKey := providers.PrivKeys[i]
 
 		instruction, err := utils.BuildMockInstruction("XRP",
 			"PAY",
-			api.SignPaymentRequest{WalletName: walletName, PaymentHash: paymentHash},
+			api.SignPaymentRequest{WalletId: walletId, KeyId: keyId, PaymentHash: paymentHash},
 			providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),

@@ -8,7 +8,6 @@ import (
 )
 
 func SignXrpPayment(paymentHash string, privateKey *ecdsa.PrivateKey) ([]byte, error) {
-
 	paymentHashBytes, err := hex.DecodeString(paymentHash)
 	if err != nil {
 		return nil, err

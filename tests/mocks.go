@@ -25,16 +25,17 @@ func BuildMockInstruction(OpType string, OpCommand string, request interface{}, 
 	}
 
 	instructionData := api.InstructionData{
-		InstructionId:             instructionId,
-		TeeId:                     teeId,
-		RewardEpochID:             rewardEpochId,
-		OpType:                    OpType,
-		OpCommand:                 OpCommand,
-		OriginalMessage:           OriginalMessage,
-		AdditionalFixedMessage:    []byte(""),
+		InstructionDataBase: api.InstructionDataBase{
+			InstructionId:          instructionId,
+			TeeId:                  teeId,
+			RewardEpochID:          rewardEpochId,
+			OpType:                 OpType,
+			OpCommand:              OpCommand,
+			OriginalMessage:        OriginalMessage,
+			AdditionalFixedMessage: []byte(""),
+		},
 		AdditionalVariableMessage: []byte(""),
 	}
-
 	nonceBytes, _ := utils.GenerateRandomBytes(32)
 
 	sig, err := requests.Sign(&instructionData, privKey)
@@ -51,12 +52,12 @@ func BuildMockInstruction(OpType string, OpCommand string, request interface{}, 
 
 }
 
-func CreateMockWallet(t *testing.T, nodeId, walletName string, privKeys []*ecdsa.PrivateKey, rewardEpochId uint32) {
+func CreateMockWallet(t *testing.T, nodeId, walletId, keyId string, privKeys []*ecdsa.PrivateKey, rewardEpochId uint32) {
 	instructionIdBytes, _ := utils.GenerateRandomBytes(32)
 
 	instruction, err := BuildMockInstruction("WALLET",
 		"KEY_GENERATE",
-		api.NewWalletRequest{Name: walletName},
+		api.NewWalletRequest{WalletId: walletId, KeyId: keyId},
 		privKeys[0],
 		nodeId,
 		hex.EncodeToString(instructionIdBytes),
@@ -64,7 +65,7 @@ func CreateMockWallet(t *testing.T, nodeId, walletName string, privKeys []*ecdsa
 	)
 	require.NoError(t, err)
 
-	err = walletsservice.NewWallet(instruction.Data)
+	err = walletsservice.NewWallet(&instruction.Data.InstructionDataBase)
 
 	require.NoError(t, err)
 

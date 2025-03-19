@@ -5,14 +5,14 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/nacl/box"
-
-	"tee-node/internal/config"
 
 	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
@@ -46,7 +46,20 @@ func Sign(msgHash []byte, privKey *ecdsa.PrivateKey) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return hashSignature, nil
+	return hashSignature, nil	
+}
+
+func CheckSignature(hash, signature []byte, voters []common.Address) (common.Address, error) {
+	pubKey, err := crypto.SigToPub(accounts.TextHash(hash), signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	address := crypto.PubkeyToAddress(*pubKey)
+	if voters != nil && !slices.Contains(voters, address) {
+		return common.Address{}, errors.New("not a voter")
+	}
+
+	return address, nil
 }
 
 // VerifySignature verifies a signature against a message hash
@@ -97,6 +110,8 @@ func SerializeCompressed(pubKey *ecdsa.PublicKey) []byte {
 	return final
 }
 
+const XRP_ALPHABET = "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"
+
 // This should be a sec1 encoded public key
 // You can use SerializeCompressed to get the sec1 encoded public key
 func GetXrpAddressFromPubkey(publicKey []byte) (string, error) {
@@ -110,7 +125,7 @@ func GetXrpAddressFromPubkey(publicKey []byte) (string, error) {
 	accBytes = append(accBytes, byte(0))
 	accBytes = append(accBytes, account[:]...)
 
-	address := Base58Encode(accBytes, config.XRP_ALPHABET)
+	address := Base58Encode(accBytes, XRP_ALPHABET)
 
 	return address, nil
 }

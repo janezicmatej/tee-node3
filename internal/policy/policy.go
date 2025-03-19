@@ -1,8 +1,7 @@
 package policy
 
 import (
-	"encoding/hex"
-
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,7 +25,7 @@ func SetNewPolicyInternal(req *api.SignNewPolicyRequest) error {
 	proposedPolicyHash := SigningPolicyHash(req.PolicyBytes)
 
 	// Get the rewardEpochId from the proposed policy
-	err = VerifyPolicyFreshness(proposedPolicy, ActiveSigningPolicy.RewardEpochId, hex.EncodeToString(proposedPolicyHash))
+	err = VerifyPolicyFreshness(proposedPolicy, ActiveSigningPolicy.RewardEpochId)
 	if err != nil {
 		return err
 	}
@@ -47,11 +46,20 @@ func SigningPolicyHash(signingPolicy []byte) []byte {
 	return hash
 }
 
-func VerifyPolicyFreshness(sigPolicy *SigningPolicy, currentRewardEpochId uint32, policyHashString string) error {
+func WeightOfSigners(signers map[common.Address][]byte, signingPolicy *SigningPolicy) uint16 {
+	currentWeight := uint16(0)
+	for i, voter := range signingPolicy.Voters {
+		if _, ok := signers[voter]; ok {
+			currentWeight += signingPolicy.Weights[i]
+		}
+	}
 
+	return currentWeight
+}
+
+func VerifyPolicyFreshness(sigPolicy *SigningPolicy, currentRewardEpochId uint32) error {
 	// Verify the policy is new and for a valid rewards epoch Id
 	if sigPolicy.RewardEpochId <= currentRewardEpochId {
-
 		return status.Error(codes.InvalidArgument, "Trying to initialize policy for an invalid reward epoch Id")
 	}
 	if _, ok := signingPolicies[sigPolicy.RewardEpochId]; ok {
@@ -61,12 +69,14 @@ func VerifyPolicyFreshness(sigPolicy *SigningPolicy, currentRewardEpochId uint32
 	return nil
 }
 
+// todo: policyHash should be obtained from policy
 func SetSigningPolicy(policy *SigningPolicy, policyHash []byte) {
 	ActiveSigningPolicy = policy
 	ActiveSigningPolicyHash = policyHash
 	signingPolicies[policy.RewardEpochId] = policy
 }
 
+// todo mutex
 func GetSigningPolicy(epochId uint32) *SigningPolicy {
 	return signingPolicies[epochId]
 }

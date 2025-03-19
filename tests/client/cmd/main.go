@@ -32,7 +32,9 @@ var args struct {
 	Call          string
 	Arg1          string
 	Provider      int
-	WalletName    string
+	WalletId      string
+	KeyId         string
+	BackupId      string
 	PubKey        string
 	TeeId         string
 	InstructionId string
@@ -162,7 +164,9 @@ func main() {
 		instruction, err := utils.BuildMockInstruction("WALLET",
 			"KEY_GENERATE",
 			api.NewWalletRequest{
-				Name: args.WalletName},
+				WalletId: args.WalletId,
+				KeyId:    args.KeyId,
+			},
 			providerPrivKey,
 			args.TeeId,
 			args.InstructionId,
@@ -184,7 +188,8 @@ func main() {
 		// TODO: Remove this function
 
 		req := &api.WalletInfoRequest{
-			Name:      args.WalletName,
+			WalletId:  args.WalletId,
+			KeyId:     args.KeyId,
 			Challenge: hex.EncodeToString(nonceBytes),
 		}
 
@@ -202,7 +207,8 @@ func main() {
 		}
 
 		req := &api.WalletInfoRequest{
-			Name:      args.WalletName,
+			WalletId:  args.WalletId,
+			KeyId:     args.KeyId,
 			Challenge: hex.EncodeToString(nonceBytes),
 		}
 
@@ -303,7 +309,11 @@ func main() {
 		instruction, err := utils.BuildMockInstruction(
 			"XRP",
 			"PAY",
-			api.SignPaymentRequest{WalletName: args.WalletName, PaymentHash: paymentHash},
+			api.SignPaymentRequest{
+				WalletId:    args.WalletId,
+				KeyId:       args.KeyId,
+				PaymentHash: paymentHash,
+			},
 			providerPrivKey,
 			args.TeeId,
 			args.InstructionId,
@@ -378,7 +388,9 @@ func main() {
 		instruction, err := utils.BuildMockInstruction("WALLET",
 			"KEY_MACHINE_BACKUP",
 			api.SplitWalletRequest{
-				Name:       args.WalletName,
+				BackupId:   args.BackupId,
+				WalletId:   args.WalletId,
+				KeyId:      args.KeyId,
 				TeeIds:     teeIds,
 				Hosts:      config.Server.Backups,
 				PublicKeys: pubKeys,
@@ -414,7 +426,9 @@ func main() {
 			shareIds[i] = strconv.Itoa(i + 1)
 		}
 		request := api.RecoverWalletRequest{
-			Name:      args.WalletName,
+			BackupId:  args.BackupId,
+			WalletId:  args.WalletId,
+			KeyId:     args.KeyId,
 			TeeIds:    args.TeeIds,
 			Hosts:     config.Server.Backups,
 			ShareIds:  shareIds,

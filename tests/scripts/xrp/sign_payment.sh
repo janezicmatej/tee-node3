@@ -31,7 +31,7 @@ declare -a accounts=()
 declare -a signatures=()  
 declare -a public_keys=()  
 
-
+j=0
 # Run initial policy simulate for each client config  
 for i in "${!client_configs[@]}"; do 
 
@@ -68,13 +68,13 @@ for i in "${!client_configs[@]}"; do
     echo $node_id
     
     for signer_idx in {0..2}; do  
-        res=$(go run tests/client/cmd/main.go --call sign_payment --arg1 $signer_idx --arg2 "foo" --arg3 $PAYMENT_HASH --arg4 $instruction_id --arg5 $node_id --rewardepochid 5 --config "${client_configs[$i]}")
+        res=$(go run tests/client/cmd/main.go --call sign_payment --provider $signer_idx --walletid qux --keyid "quux${j}" --instructionid $instruction_id --teeid $node_id --arg1 $PAYMENT_HASH --rewardepochid 5 --config "${client_configs[$i]}")
         echo $res
     done  
 
 
     # Capture the account info
-    command_output=$(go run tests/client/cmd/main.go --call get_payment_signature --arg1 $instruction_id --config "${client_configs[$i]}")  
+    command_output=$(go run tests/client/cmd/main.go --call get_payment_signature --instructionid $instruction_id --config "${client_configs[$i]}")  
 
     # Extract Account Info
     account=$(echo "$command_output" | grep -o "Account [^,]*" | cut -d' ' -f2)  
@@ -84,6 +84,9 @@ for i in "${!client_configs[@]}"; do
     accounts+=("$account")
     signatures+=("$txn_signature")
     public_keys+=("$public_key")
+
+    j=$(($j+1))
+
 done  
 
 

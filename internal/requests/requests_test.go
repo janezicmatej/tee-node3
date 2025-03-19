@@ -3,6 +3,7 @@ package requests_test
 import (
 	"encoding/hex"
 	"tee-node/internal/config"
+	"tee-node/internal/node"
 	"tee-node/internal/policy"
 	"tee-node/internal/requests"
 	"tee-node/internal/utils"
@@ -15,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const walletName = "wallet1"
+const walletId = "wallet1"
+const keyId = "key1"
 
 func TestInvalidRequestSignature(t *testing.T) {
-
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
@@ -27,9 +28,9 @@ func TestInvalidRequestSignature(t *testing.T) {
 	instruction, err := testutils.BuildMockInstruction(
 		"WALLET",
 		"KEY_GENERATE",
-		api.NewWalletRequest{Name: walletName},
+		api.NewWalletRequest{WalletId: walletId, KeyId: keyId},
 		privKeys[0],
-		"1234",
+		node.GetNodeId().Id,
 		hex.EncodeToString(instructionIdBytes),
 		1,
 	)
@@ -50,7 +51,6 @@ func TestInvalidRequestSignature(t *testing.T) {
 }
 
 func TestRequestCheckActive(t *testing.T) {
-
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	sigPolicy, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
@@ -59,16 +59,18 @@ func TestRequestCheckActive(t *testing.T) {
 	instruction, err := testutils.BuildMockInstruction(
 		"WALLET",
 		"KEY_GENERATE",
-		api.NewWalletRequest{Name: walletName},
+		api.NewWalletRequest{WalletId: walletId, KeyId: keyId},
 		privKeys[0],
-		"1234",
+		node.GetNodeId().Id,
 		hex.EncodeToString(instructionIdBytes),
 		1,
 	)
 	require.NoError(t, err)
 
 	// Process the request
-	_, _, err = requests.ProcessRequest(*instruction.Data, instruction.Signature)
+	_, err = requests.CheckSigner(instruction.Data, instruction.Signature)
+	require.NoError(t, err)
+	_, err = requests.GetRequestCounter(instruction.Data)
 	require.NoError(t, err)
 
 	// Increase the reward epoch id by config.ACTIVE_POLICY_COUNT (should pass)
@@ -79,7 +81,7 @@ func TestRequestCheckActive(t *testing.T) {
 		policy.SetSigningPolicy(&sigPolicy, policy.SigningPolicyHash(policyBytes))
 	}
 
-	_, _, err = requests.ProcessRequest(*instruction.Data, instruction.Signature)
+	_, err = requests.CheckSigner(instruction.Data, instruction.Signature)
 	require.NoError(t, err)
 
 	// Increase the reward epoch id by 1 (should fail)
@@ -88,9 +90,8 @@ func TestRequestCheckActive(t *testing.T) {
 	policyBytes, _ := policy.EncodeSigningPolicy(&sigPolicy)
 	policy.SetSigningPolicy(&sigPolicy, policy.SigningPolicyHash(policyBytes))
 
-	_, _, err = requests.ProcessRequest(*instruction.Data, instruction.Signature)
+	err = requests.CheckRequest(instruction.Data)
 	if assert.Error(t, err) {
-		assert.Equal(t, "not active", err.Error())
+		assert.Equal(t, "reward epoch id too old", err.Error())
 	}
-
 }

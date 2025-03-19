@@ -22,7 +22,7 @@ Initialize the TEE nodes with (simulated) initial policy with 3 data providers
 
 ### Create a new wallet
 
-Use 3 data providers to create a new wallet with unique ID `foo`:
+Use 3 data providers to create a new wallet with unique walletId `foo` and keyId `bar`:
 
 ```bash
 ./tests/scripts/wallet/create_wallet.sh

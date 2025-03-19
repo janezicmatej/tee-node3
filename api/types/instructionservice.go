@@ -6,22 +6,13 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// * ——————————————— POST Requests ——————————————— * //
-
-const (
-	InstructionRequest RequestType = iota
-	SignPolicyRequest
-)
-
-type RequestType int
-
 type Instruction struct {
 	Challenge string
 	Data      *InstructionData
 	Signature []byte
 }
 
-type InstructionData struct {
+type InstructionDataBase struct {
 	InstructionId string
 	TeeId         string
 	RewardEpochID uint32
@@ -31,8 +22,12 @@ type InstructionData struct {
 	OriginalMessage []byte
 	// Binary data, depending on operation type and instruction. Go JSON marshaled. (Fixed, because it's the same for all providers)
 	AdditionalFixedMessage []byte
+}
+
+type InstructionData struct {
+	InstructionDataBase
 	// Binary data, —||—. (Variable, because it's different for each provider. Example: signature of AdditionalFixedMessage, or price prediction)
-	AdditionalVariableMessage []byte `json:"-"` // Hide the field in json encoding
+	AdditionalVariableMessage []byte
 }
 
 func (d InstructionData) Identifier() string {
@@ -44,17 +39,17 @@ func (data InstructionData) Hash() []byte {
 	if err != nil {
 		return nil
 	}
-	// TODO: Test if this really ignores AdditionalVariableMessage
 
 	return crypto.Keccak256(result)
 }
 
-func (d InstructionData) RequestType() RequestType {
-	return InstructionRequest
-}
+func (data InstructionDataBase) Hash() []byte {
+	result, err := json.Marshal(data) // Encode without the field
+	if err != nil {
+		return nil
+	}
 
-func (d InstructionData) RewardEpochId() uint32 {
-	return d.RewardEpochID
+	return crypto.Keccak256(result)
 }
 
 type InstructionResponse struct {

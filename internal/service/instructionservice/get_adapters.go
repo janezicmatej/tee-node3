@@ -2,7 +2,7 @@ package instructionservice
 
 import (
 	"encoding/json"
-	api "tee-node/api/types"
+	"tee-node/internal/requests"
 	"tee-node/internal/service/instructionservice/signingservice"
 
 	"google.golang.org/grpc/codes"
@@ -12,8 +12,8 @@ import (
 // * ----- REG OpType ----- * //
 
 // TODO: Implement this service and APIs
-func handleRegGetRequest(instructionData *api.InstructionData, result []byte) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleRegGetRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 	case "AVAILABILITY_CHECK":
 		return nil, status.Error(codes.Unimplemented, "REG AVAILABILITY_CHECK command not implemented yet")
 
@@ -31,8 +31,8 @@ func handleRegGetRequest(instructionData *api.InstructionData, result []byte) ([
 
 // * ----- WALLET OpType ----- * //
 
-func handleWalletGetRequest(instructionData *api.InstructionData, result []byte) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleWalletGetRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 
 	case "KEY_GENERATE":
 
@@ -73,12 +73,12 @@ func handleWalletGetRequest(instructionData *api.InstructionData, result []byte)
 
 // * ----- XRP OpType ----- * //
 
-func handleXrpGetRequest(instructionData *api.InstructionData, requestResult []byte) ([]byte, error) {
+func handleXrpGetRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
 
-	switch instructionData.OpCommand {
+	switch requestCounter.Request.OpCommand {
 	case "PAY":
 
-		response, err := signingservice.GetPaymentSignature(instructionData, requestResult)
+		response, err := signingservice.GetPaymentSignature(requestCounter.Request, requestCounter.Result)
 		if err != nil {
 			return nil, err
 		}
@@ -99,8 +99,8 @@ func handleXrpGetRequest(instructionData *api.InstructionData, requestResult []b
 
 }
 
-func handleBtcGetRequest(instructionData *api.InstructionData, result []byte) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleBtcGetRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 	case "PAY":
 		return nil, status.Error(codes.Unimplemented, "BTC PAY command not implemented yet")
 
@@ -113,8 +113,8 @@ func handleBtcGetRequest(instructionData *api.InstructionData, result []byte) ([
 	}
 }
 
-func handleFdcGetRequest(instructionData *api.InstructionData, result []byte) ([]byte, error) {
-	switch instructionData.OpCommand {
+func handleFdcGetRequest(requestCounter *requests.RequestCounter) ([]byte, error) {
+	switch requestCounter.Request.OpCommand {
 	case "PROVE":
 		return nil, status.Error(codes.Unimplemented, "FDC PROVE command not implemented yet")
 

@@ -2,14 +2,8 @@ package instructionservice
 
 import (
 	"context"
-	"encoding/hex"
-	"slices"
-	"sync"
 	api "tee-node/api/types"
 	"tee-node/internal/attestation"
-	"tee-node/internal/config"
-	"tee-node/internal/node"
-	"tee-node/internal/policy"
 	"tee-node/internal/requests"
 	"tee-node/internal/service/instructionservice/walletsservice"
 
@@ -17,20 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-// instructionIdToHash handles the mapping needed to find all the instructions
-// based on instruction Id
-var instructionIdToHash = InitInstructionIdToHashes()
-
-type InstructionIdToHashes struct {
-	Map map[string][]string
-
-	sync.Mutex
-}
-
-func InitInstructionIdToHashes() *InstructionIdToHashes {
-	return &InstructionIdToHashes{Map: make(map[string][]string)}
-}
 
 // InstructionService handles forwarding JSON-RPC method calls to the appropriate service
 type InstructionService struct {
@@ -53,36 +33,49 @@ func (s *InstructionService) SendSignedInstruction(ctx context.Context, instruct
 	// TODO: Is there any other check that should be done here?
 	// Todo: Checks if InstructionId is valid, rewardEpochId is correct, etc.
 	// TODO: Anti DOS checks
-	err := CheckInstruction(instructionMessage.Data)
+	err := requests.CheckRequest(instructionMessage.Data)
 	if err != nil {
 		return nil, err
 	}
 
-	requestCounter, thresholdReached, err := requests.ProcessRequest(*instructionMessage.Data, instructionMessage.Signature)
+	signer, err := requests.CheckSigner(instructionMessage.Data, instructionMessage.Signature)
 	if err != nil {
 		return nil, err
 	}
-	processInstructionIdMapping(instructionMessage.Data)
+	requestCounter, err := requests.GetRequestCounter(instructionMessage.Data)
+	if err != nil {
+		return nil, err
+	}
 
-	finalized := thresholdReached && !requestCounter.Done
-	if finalized {
+	requestCounter.Lock()
+	defer requestCounter.Unlock()
+	requestCounter.AddRequestSignature(signer, instructionMessage.Signature)
+	requestCounter.AddRequestVariableMessage(signer, instructionMessage.Data.AdditionalVariableMessage)
 
+	// todo: currently the threshold if equal for all, should be changed
+	thresholdReached := requestCounter.ThresholdReached()
+	requests.ProcessInstructionIdMapping(requestCounter.Request)
+
+	finalize := thresholdReached && !requestCounter.Done
+	if finalize {
 		switch instructionMessage.Data.OpType {
-
 		case "REG":
-			requestCounter.Result, err = handleRegPostRequest(instructionMessage.Data)
+			requestCounter.Result, err = handleRegPostRequest(requestCounter)
+
+		case "POLICY":
+			requestCounter.Result, err = handlePolicyPostRequest(requestCounter)
 
 		case "WALLET":
-			requestCounter.Result, err = handleWalletPostRequest(instructionMessage.Data, requestCounter.Signatures())
+			requestCounter.Result, err = handleWalletPostRequest(requestCounter)
 
 		case "XRP":
-			requestCounter.Result, err = handleXrpPostRequest(instructionMessage.Data)
+			requestCounter.Result, err = handleXrpPostRequest(requestCounter)
 
 		case "BTC":
-			requestCounter.Result, err = handleBtcPostRequest(instructionMessage.Data)
+			requestCounter.Result, err = handleBtcPostRequest(requestCounter)
 
 		case "FDC":
-			requestCounter.Result, err = handleFdcPostRequest(instructionMessage.Data)
+			requestCounter.Result, err = handleFdcPostRequest(requestCounter)
 
 		default:
 			return nil, status.Error(codes.InvalidArgument, "invalid operation type")
@@ -113,7 +106,7 @@ func (s *InstructionService) SendSignedInstruction(ctx context.Context, instruct
 			Token:  token,
 		},
 		Data:      []byte{}, // todo: do we need this?
-		Finalized: finalized,
+		Finalized: finalize,
 	}, nil
 
 }
@@ -127,19 +120,21 @@ func (s *InstructionService) InstructionResult(ctx context.Context, instructionQ
 	default:
 	}
 
-	// find the request that was finalized
-	instructionIdToHash.Lock()
-	requestsWithId, ok := instructionIdToHash.Map[instructionQuery.InstructionId]
-	instructionIdToHash.Unlock()
+	requestsWithId, ok := requests.GetHashesWithId(instructionQuery.InstructionId)
 	if !ok {
 		return nil, status.Error(codes.NotFound, "request not found")
 	}
 
-	var requestCounterFinalized *requests.RequestCounter[api.InstructionData]
+	// find the request that was finalized
+	var requestCounterFinalized *requests.RequestCounter
 	for _, instructionHash := range requestsWithId {
-		requestCounter, err := requests.GetRequestCounter[api.InstructionData](instructionHash, api.InstructionRequest)
+		requestCounter, exists, err := requests.GetRequestCounterByHash(instructionHash)
+		// these two errors should not happen
 		if err != nil {
-			return nil, status.Error(codes.NotFound, err.Error()) // TODO: is an error to strict here?
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if !exists {
+			return nil, errors.New("request non existent")
 		}
 		if !requestCounter.Done || requestCounter.Result == nil {
 			continue
@@ -157,19 +152,19 @@ func (s *InstructionService) InstructionResult(ctx context.Context, instructionQ
 
 	switch requestCounterFinalized.Request.OpType {
 	case "REG":
-		instructionResultData, err = handleRegGetRequest(&requestCounterFinalized.Request, requestCounterFinalized.Result)
+		instructionResultData, err = handleRegGetRequest(requestCounterFinalized)
 
 	case "WALLET":
-		instructionResultData, err = handleWalletGetRequest(&requestCounterFinalized.Request, requestCounterFinalized.Result)
+		instructionResultData, err = handleWalletGetRequest(requestCounterFinalized)
 
 	case "XRP":
-		instructionResultData, err = handleXrpGetRequest(&requestCounterFinalized.Request, requestCounterFinalized.Result)
+		instructionResultData, err = handleXrpGetRequest(requestCounterFinalized)
 
 	case "BTC":
-		instructionResultData, err = handleBtcGetRequest(&requestCounterFinalized.Request, requestCounterFinalized.Result)
+		instructionResultData, err = handleBtcGetRequest(requestCounterFinalized)
 
 	case "FDC":
-		instructionResultData, err = handleFdcGetRequest(&requestCounterFinalized.Request, requestCounterFinalized.Result)
+		instructionResultData, err = handleFdcGetRequest(requestCounterFinalized)
 
 	default:
 		return nil, status.Error(codes.InvalidArgument, "invalid operation type")
@@ -202,9 +197,7 @@ func (s *InstructionService) InstructionStatus(ctx context.Context, instructionQ
 	}
 
 	// find the request that was finalized
-	instructionIdToHash.Lock()
-	requestsWithId, ok := instructionIdToHash.Map[instructionQuery.InstructionId]
-	instructionIdToHash.Unlock()
+	requestsWithId, ok := requests.GetHashesWithId(instructionQuery.InstructionId)
 	if !ok {
 		return nil, errors.New("request not found")
 	}
@@ -213,19 +206,17 @@ func (s *InstructionService) InstructionStatus(ctx context.Context, instructionQ
 	var voteResults []api.VoteResult = make([]api.VoteResult, 0)
 	instructionStatus := "inProgress"
 	for _, instructionHash := range requestsWithId {
-		requestCounter, err := requests.GetRequestCounter[api.InstructionData](instructionHash, api.InstructionRequest)
+		requestCounter, exists, err := requests.GetRequestCounterByHash(instructionHash)
 		if err != nil {
 			return nil, status.Error(codes.NotFound, err.Error()) // TODO: is an error to strict here?
 		}
-
-		requestPolicy, err := requestCounter.GetRequestPolicy()
-		if err != nil {
-			return nil, status.Error(codes.NotFound, err.Error())
+		if !exists {
+			return nil, errors.New("request non existent")
 		}
 
 		voteResults = append(voteResults, api.VoteResult{
 			NumberOfVotes: uint16(len(requestCounter.RequestSignatures)),
-			TotalWeight:   requestCounter.CurrentWeight(requestPolicy),
+			TotalWeight:   requestCounter.CurrentWeight(),
 		})
 
 		if requestCounter.Done {
@@ -262,61 +253,4 @@ func (s *InstructionService) WalletInfo(ctx context.Context, req *api.WalletInfo
 	}
 
 	return walletsservice.WalletInfo(req)
-}
-
-// * HELPERS * ==================================================== // Extract this to a separate file
-func CheckInstruction(instructionData *api.InstructionData) error {
-	nodeId := node.GetNodeId()
-	if instructionData.TeeId != nodeId.Id {
-		return errors.New("invalid TEE id")
-	}
-
-	if policy.ActiveSigningPolicy.RewardEpochId < instructionData.RewardEpochID {
-		return errors.New("reward epoch not started yet")
-	}
-	if policy.ActiveSigningPolicy.RewardEpochId-instructionData.RewardEpochID > config.ACTIVE_POLICY_COUNT {
-		return errors.New("reward epoch id too old")
-	}
-
-	// Check the command is valid
-	valid := IsValidCommand(instructionData.OpType, instructionData.OpCommand)
-	if !valid {
-		return status.Error(codes.InvalidArgument, "invalid command for operation type")
-	}
-
-	return nil
-}
-
-// IsValidSubCommand checks if the OpType and Command is valid for a given operation type
-func IsValidCommand(op, command string) bool {
-	validCommands, exists := config.InstructionOperations[op]
-	if !exists {
-		return false
-	}
-
-	for _, cmd := range validCommands {
-		if cmd == command {
-			return true
-		}
-	}
-	return false
-}
-
-func processInstructionIdMapping(instructionData *api.InstructionData) {
-	instructionIdToHash.Lock()
-
-	if _, ok := instructionIdToHash.Map[instructionData.InstructionId]; !ok {
-		instructionIdToHash.Map[instructionData.InstructionId] = make([]string, 0)
-	}
-
-	instructionHash := hex.EncodeToString(instructionData.Hash())
-
-	// If the instruction hash is already in the list, we don't need to add it again
-	if slices.Contains(instructionIdToHash.Map[instructionData.InstructionId], instructionHash) {
-		instructionIdToHash.Unlock()
-		return
-	}
-
-	instructionIdToHash.Map[instructionData.InstructionId] = append(instructionIdToHash.Map[instructionData.InstructionId], instructionHash)
-	instructionIdToHash.Unlock()
 }
