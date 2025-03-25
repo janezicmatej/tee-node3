@@ -25,7 +25,7 @@ func InitializePolicyRequest(InitialPolicyBytes []byte, NewPolicyRequests []api.
 	currentPolicyHash := SigningPolicyHash(InitialPolicyBytes)
 
 	// Check that the policy matches the initial policy in the config file
-	if config.InitialPolicyHash != hex.EncodeToString(currentPolicyHash) {
+	if config.InitialPolicyHash != hex.EncodeToString(currentPolicyHash) && config.Mode == 0 {
 		return status.Error(codes.InvalidArgument, "policy does not match the initial policy in the config file")
 	} else {
 		SetSigningPolicy(currentPolicy, currentPolicyHash)
