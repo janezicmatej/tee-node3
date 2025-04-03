@@ -103,3 +103,37 @@ var MaxRequestSize = map[string]map[string]MessageSizeContraint{
 		"PROVE": standardSizeConstraint,
 	},
 }
+
+const ThresholdSetByPolicy = -1
+
+// Threshold needed to execute an instruction (-1 means defined by the signing policy)
+var Thresholds = map[string]map[string]int{
+	"REG": {
+		"AVAILABILITY_CHECK":   ThresholdSetByPolicy,
+		"TO_PAUSE_FOR_UPGRADE": ThresholdSetByPolicy,
+		"REPLICATE_FROM":       ThresholdSetByPolicy,
+	},
+	"WALLET": {
+		"KEY_GENERATE":              ThresholdSetByPolicy,
+		"KEY_DELETE":                ThresholdSetByPolicy,
+		"KEY_MACHINE_BACKUP":        ThresholdSetByPolicy,
+		"KEY_MACHINE_RESTORE":       ThresholdSetByPolicy,
+		"KEY_MACHINE_BACKUP_REMOVE": ThresholdSetByPolicy,
+		"KEY_CUSTODIAN_BACKUP":      ThresholdSetByPolicy,
+		"KEY_CUSTODIAN_RESTORE":     ThresholdSetByPolicy,
+	},
+	"POLICY": {
+		"UPDATE_POLICY": 0,
+	},
+	"XRP": {
+		"PAY":     ThresholdSetByPolicy,
+		"REISSUE": ThresholdSetByPolicy,
+	},
+	"BTC": {
+		"PAY":     ThresholdSetByPolicy,
+		"REISSUE": ThresholdSetByPolicy,
+	},
+	"FDC": {
+		"PROVE": ThresholdSetByPolicy,
+	},
+}

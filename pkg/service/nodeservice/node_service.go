@@ -10,6 +10,11 @@ import (
 
 func GetNodeInfo(req *api.GetNodeInfoRequest) (*api.GetNodeInfoResponse, error) {
 	nodeId := node.GetNodeId()
+	activePolicy := policy.GetActiveSigningPolicy()
+	activePolicyHash, err := policy.SigningPolicyToHash(activePolicy)
+	if err != nil {
+		return nil, err
+	}
 
 	responseData := api.GetNodeInfoData{
 		Id:                  nodeId.Id,
@@ -19,7 +24,7 @@ func GetNodeInfo(req *api.GetNodeInfoRequest) (*api.GetNodeInfoResponse, error) 
 			X: nodeId.SignatureKey.PublicKey.X.Text(16),
 			Y: nodeId.SignatureKey.PublicKey.Y.Text(16),
 		},
-		SigningPolicyHash: hex.EncodeToString(policy.ActiveSigningPolicyHash),
+		SigningPolicyHash: hex.EncodeToString(activePolicyHash),
 	}
 
 	hash, err := responseData.Hash()

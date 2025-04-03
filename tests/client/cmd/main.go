@@ -74,7 +74,7 @@ func main() {
 				log.Fatalf("%v", err)
 			}
 		}
-		voters, privKeys := utils.GenerateRandomVoters(numVoters)
+		voters, privKeys, _ := utils.GenerateRandomVoters(numVoters)
 
 		providers := &utils.Providers{Voters: voters, PrivKeys: privKeys}
 
@@ -97,13 +97,26 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to connect to DB: %v", err)
 		}
-		params := policy.PolicyHistoryParams{RelayContractAddress: common.HexToAddress(config.Chain.RelayContractAddress), FlareSystemManagerContractAddress: common.HexToAddress(config.Chain.FlareSystemManagerContractAddress)}
+		params := &policy.PolicyHistoryParams{RelayContractAddress: common.HexToAddress(config.Chain.RelayContractAddress),
+			FlareSystemManagerContractAddress: common.HexToAddress(config.Chain.FlareSystemManagerContractAddress),
+			FlareVoterRegistryContractAddress: common.HexToAddress(config.Chain.FlareVoterRegistryContractAddress),
+		}
 
-		policies, signatures, err := policy.FetchPolicyHistory(ctx, &params, db)
+		policies, signatures, err := policy.FetchPolicyHistory(ctx, params, db)
 		if err != nil {
 			log.Fatalf("could not fetch policy: %v", err)
 		}
-		req, err := policy.CreateSigningRequest(policies, signatures)
+		activePolicyRewardEpoch := int(policies[len(policies)-1].RewardEpochId.Int64())
+		minBlockNum, maxBlockNum, err := policy.FetchVoterRegisteredBlocksInfo(context.Background(), params, db, activePolicyRewardEpoch)
+		if err != nil {
+			log.Fatalf("could not fetch blocks info: %v", err)
+		}
+		pubKeysMap, err := policy.FetchVotersPublicKeysMap(context.Background(), params, db, minBlockNum, maxBlockNum, activePolicyRewardEpoch)
+		if err != nil {
+			log.Fatalf("could not fetch public keys: %v", err)
+		}
+
+		req, err := policy.CreateInitializePolicyRequest(policies, signatures, pubKeysMap)
 		if err != nil {
 			log.Fatalf("could not create signing request: %v", err)
 		}
@@ -123,6 +136,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
+		pubKeys := make([]api.ECDSAPublicKey, len(providers.PrivKeys))
+		for i, voter := range providers.PrivKeys {
+			pubKeys[i] = api.ECDSAPublicKey{
+				X: voter.PublicKey.X.String(),
+				Y: voter.PublicKey.Y.String(),
+			}
+		}
 
 		epochId, randSeed := uint32(1), int64(12345)
 		initialPolicy := utils.GenerateRandomPolicyData(epochId, providers.Voters, randSeed)
@@ -131,7 +151,7 @@ func main() {
 			log.Fatalf("%v", err)
 		}
 
-		hash := policyserver.SigningPolicyHash(initialPolicyBytes)
+		hash := policyserver.SigningPolicyBytesToHash(initialPolicyBytes)
 		fmt.Println(hex.EncodeToString(hash))
 
 		numPolicies := 5
@@ -141,8 +161,9 @@ func main() {
 		}
 
 		req := &api.InitializePolicyRequest{
-			InitialPolicyBytes: initialPolicyBytes,
-			NewPolicyRequests:  policySignaturesArray,
+			InitialPolicyBytes:     initialPolicyBytes,
+			NewPolicyRequests:      policySignaturesArray,
+			LatestPolicyPublicKeys: pubKeys,
 		}
 		_, err = utils.Post[api.InitializePolicyResponse](config.Server.Host+"/policies/initialize", req)
 		if err != nil {

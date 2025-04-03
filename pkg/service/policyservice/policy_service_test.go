@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"tee-node/pkg/policy"
 
@@ -21,7 +19,7 @@ func TestInitializePolicy(t *testing.T) {
 
 	// Generate random voters and corresponding private keys
 	numVoters = 100
-	voters, privKeys := testutils.GenerateRandomVoters(numVoters)
+	voters, privKeys, pubKeysMap := testutils.GenerateRandomVoters(numVoters)
 
 	// Generate a random initial policy
 	randSeed := int64(12345)
@@ -52,12 +50,20 @@ func TestInitializePolicy(t *testing.T) {
 
 		policySignatures := testutils.BuildMultiSignedPolicy(nextPolicyBytes, privKeys)
 		policySignaturesArray = append(policySignaturesArray, policySignatures)
+	}
 
+	pubKeys := make([]api.ECDSAPublicKey, len(voters))
+	for i, voter := range voters {
+		pubKeys[i] = api.ECDSAPublicKey{
+			X: pubKeysMap[voter].X.String(),
+			Y: pubKeysMap[voter].Y.String(),
+		}
 	}
 
 	req := &api.InitializePolicyRequest{
-		InitialPolicyBytes: initialPolicyBytes,
-		NewPolicyRequests:  policySignaturesArray,
+		InitialPolicyBytes:     initialPolicyBytes,
+		NewPolicyRequests:      policySignaturesArray,
+		LatestPolicyPublicKeys: pubKeys,
 	}
 
 	response, err := InitializePolicy(req)
@@ -77,7 +83,7 @@ func TestInitializingThePolicyTwice(t *testing.T) {
 	epochId, randSeed := uint32(1), int64(12345)
 
 	numVoters := 100
-	_, initialPolicyBytes, voters, privKeys, err := testutils.GenerateRandomValidPolicyAndSigners(epochId, randSeed, numVoters)
+	_, initialPolicyBytes, voters, privKeys, pubKeys, err := testutils.GenerateRandomValidPolicyAndSigners(epochId, randSeed, numVoters)
 	if err != nil {
 		t.Errorf("Failed to generate the initial policy")
 	}
@@ -92,8 +98,9 @@ func TestInitializingThePolicyTwice(t *testing.T) {
 	}
 
 	req := &api.InitializePolicyRequest{
-		InitialPolicyBytes: initialPolicyBytes,
-		NewPolicyRequests:  policySignaturesArray,
+		InitialPolicyBytes:     initialPolicyBytes,
+		NewPolicyRequests:      policySignaturesArray,
+		LatestPolicyPublicKeys: pubKeys,
 	}
 
 	_, err = InitializePolicy(req)
@@ -104,7 +111,7 @@ func TestInitializingThePolicyTwice(t *testing.T) {
 	// & Try to initialize the policy again ------------------------------------------- //
 	epochId2, randSeed2 := uint32(2), int64(54321)
 
-	_, initialPolicyBytes2, _, _, err := testutils.GenerateRandomValidPolicyAndSigners(epochId2, randSeed2, numVoters)
+	_, initialPolicyBytes2, _, _, _, err := testutils.GenerateRandomValidPolicyAndSigners(epochId2, randSeed2, numVoters)
 	if err != nil {
 		t.Errorf("Failed to generate the initial policy")
 	}
@@ -115,26 +122,15 @@ func TestInitializingThePolicyTwice(t *testing.T) {
 	}
 
 	req2 := &api.InitializePolicyRequest{
-		InitialPolicyBytes: initialPolicyBytes2,
-		NewPolicyRequests:  policySignaturesArray2,
+		InitialPolicyBytes:     initialPolicyBytes2,
+		NewPolicyRequests:      policySignaturesArray2,
+		LatestPolicyPublicKeys: pubKeys,
 	}
 
 	_, err = InitializePolicy(req2)
 
-	// Convert error to gRPC status
-	st, ok := status.FromError(err)
-	if !ok {
-		t.Fatal("expected gRPC error status")
-	}
-
-	// Check error code
-	if st.Code() != codes.InvalidArgument {
-		t.Errorf("expected InvalidArgument, got %v", st.Code())
-	}
-
-	// Check error message/description
-	if st.Message() != "policy already initialized" {
-		t.Errorf("expected 'policy already initialized', got %v", st.Message())
+	if err.Error() != "policy already initialized" {
+		t.Errorf("expected 'policy already initialized', got %v", err)
 	}
 
 }
@@ -146,7 +142,7 @@ func TestSendingInvalidReardEpochId(t *testing.T) {
 	epochId, randSeed := uint32(10), int64(12345)
 
 	numVoters := 100
-	_, initialPolicyBytes, voters, privKeys, err := testutils.GenerateRandomValidPolicyAndSigners(epochId, randSeed, numVoters)
+	_, initialPolicyBytes, voters, privKeys, pubKeys, err := testutils.GenerateRandomValidPolicyAndSigners(epochId, randSeed, numVoters)
 	if err != nil {
 		t.Errorf("Failed to generate the initial policy")
 	}
@@ -163,8 +159,9 @@ func TestSendingInvalidReardEpochId(t *testing.T) {
 	}
 
 	req := &api.InitializePolicyRequest{
-		InitialPolicyBytes: initialPolicyBytes,
-		NewPolicyRequests:  policySignaturesArray,
+		InitialPolicyBytes:     initialPolicyBytes,
+		NewPolicyRequests:      policySignaturesArray,
+		LatestPolicyPublicKeys: pubKeys,
 	}
 
 	_, err = InitializePolicy(req)

@@ -8,34 +8,35 @@ import (
 
 	api "tee-node/api/types"
 
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
 )
 
 func InitializePolicy(req *api.InitializePolicyRequest) (*api.InitializePolicyResponse, error) {
-	err := policy.InitializePolicyRequest(req.InitialPolicyBytes, req.NewPolicyRequests)
+	err := policy.InitializePolicyRequest(req.InitialPolicyBytes, req.NewPolicyRequests, req.LatestPolicyPublicKeys)
 	if err != nil {
 		return nil, err
 	}
 
 	// Register the validators from the latest policy for the ratelimiter
-	requests.UpdateRateLimiter(policy.ActiveSigningPolicy.Voters)
+	requests.UpdateRateLimiter(policy.GetActiveSigningPolicy().Voters)
 
 	return &api.InitializePolicyResponse{}, nil
 }
 
 // GetActivePolicy handles the GetActivePolicy request
 func GetActivePolicy(req *api.GetActivePolicyRequest) (*api.GetActivePolicyResponse, error) {
-	if policy.ActiveSigningPolicy == nil {
-		return nil, rpc.ErrNoResult
+	activeSigningPolicy := policy.GetActiveSigningPolicy()
+	if activeSigningPolicy == nil {
+		return nil, errors.New("no active policy")
 	}
-
-	activePolicyBytes, err := policy.EncodeSigningPolicy(policy.ActiveSigningPolicy)
+	activePolicyBytes, err := policy.EncodeSigningPolicy(activeSigningPolicy)
 	if err != nil {
 		return nil, err
 	}
+	activePolicyHash := policy.SigningPolicyBytesToHash(activePolicyBytes)
 
 	// Get the attestation token
-	nonces := []string{req.Challenge, hex.EncodeToString(activePolicyBytes)}
+	nonces := []string{req.Challenge}
 	var tokenBytes []byte
 	tokenBytes, err = attestation.GetGoogleAttestationToken(nonces, attestation.OIDCTokenType)
 	if err != nil {
@@ -44,7 +45,7 @@ func GetActivePolicy(req *api.GetActivePolicyRequest) (*api.GetActivePolicyRespo
 
 	return &api.GetActivePolicyResponse{
 		ActivePolicy:     activePolicyBytes,
-		ActivePolicyHash: hex.EncodeToString(policy.ActiveSigningPolicyHash),
+		ActivePolicyHash: hex.EncodeToString(activePolicyHash),
 		Token:            string(tokenBytes),
 	}, nil
 }

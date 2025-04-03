@@ -13,19 +13,18 @@ import (
 func UpdatePolicy(instructionData *instruction.DataFixed) error {
 	// multiSignedPolicy doesn't get encoded in the originalMessage. The entire struct is
 	//  in the AdditionalFixedMessage
-	var multiSignedPolicy api.MultiSignedPolicy
-	err := json.Unmarshal(instructionData.AdditionalFixedMessage, &multiSignedPolicy)
-
+	var updatePolicyRequest api.UpdatePolicyRequest
+	err := json.Unmarshal(instructionData.AdditionalFixedMessage, &updatePolicyRequest)
 	if err != nil {
 		return err
 	}
 
-	err = policy.UpdatePolicyRequest(multiSignedPolicy)
+	err = policy.UpdatePolicyRequest(updatePolicyRequest.NewPolicyRequest, updatePolicyRequest.LatestPolicyPublicKeys)
 	if err != nil {
 		return err
 	}
 
-	requests.UpdateRateLimiter(policy.ActiveSigningPolicy.Voters)
+	requests.UpdateRateLimiter(policy.GetActiveSigningPolicy().Voters)
 
 	return nil
 }

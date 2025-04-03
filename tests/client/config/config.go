@@ -27,6 +27,7 @@ type Server struct {
 type Chain struct {
 	RelayContractAddress              string `toml:"relay_contract_address"`
 	FlareSystemManagerContractAddress string `toml:"flare_system_manager_contract_address"`
+	FlareVoterRegistryContractAddress string `toml:"flare_voter_registry_contract_address"`
 }
 
 // ReadConfigs reads user and system configurations from userFilePath and systemDirectoryPath.

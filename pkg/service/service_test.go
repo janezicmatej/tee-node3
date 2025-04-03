@@ -3,7 +3,6 @@ package service
 // TODO: These test now need to be adapted, because the services are only available through the InstructionService
 
 import (
-	"context"
 	"encoding/hex"
 	"log"
 	"math/big"
@@ -41,8 +40,6 @@ func TestServiceEndToEnd(t *testing.T) {
 		log.Fatalf("failed to init node: %v", err)
 	}
 
-	ctx := context.Background()
-
 	go LaunchServer(hostPort)
 	go LaunchWSServer(50061)
 	time.Sleep(time.Second)
@@ -58,41 +55,41 @@ func TestServiceEndToEnd(t *testing.T) {
 
 	// initialize random policies
 	numPolicies := 5
-	initializePolicy(t, numPolicies, providers, ctx)
+	initializePolicy(t, numPolicies, providers)
 
-	nodeId, pubKey := getNodeInfo(t, ctx)
+	nodeId, pubKey := getNodeInfo(t)
 
 	// generate a new wallet
-	createWallet(t, nodeId, walletId, keyId, providers, ctx)
+	createWallet(t, nodeId, walletId, keyId, providers)
 	// get address
-	address := getAddress(t, walletId, keyId, ctx)
+	address := getAddress(t, walletId, keyId)
 
 	// backup wallet to yourself
 	ids := []string{nodeId, nodeId}
 	backups := []string{"ws://localhost:50061", "ws://localhost:50061"}
 	pubKeys := []string{pubKey, pubKey}
 	threshold := len(backups)
-	backupWallet(t, nodeId, walletId, keyId, backupId, ids, backups, pubKeys, threshold, providers, ctx)
+	backupWallet(t, nodeId, walletId, keyId, backupId, ids, backups, pubKeys, threshold, providers)
 
 	// delete wallet
-	deleteWallet(t, nodeId, walletId, keyId, providers, ctx)
+	deleteWallet(t, nodeId, walletId, keyId, providers)
 
 	time.Sleep(time.Second)
 
 	// recover key
-	recoverWallet(t, nodeId, walletId, keyId, backupId, address, ids, backups, pubKey, threshold, providers, ctx)
+	recoverWallet(t, nodeId, walletId, keyId, backupId, address, ids, backups, pubKey, threshold, providers)
 
 	// get recovered address
-	recoveredAddress := getAddress(t, walletId, keyId, ctx)
+	recoveredAddress := getAddress(t, walletId, keyId)
 	require.Equal(t, address, recoveredAddress)
 
 	// sign transaction
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
-	instructionId := signTransaction(t, nodeId, walletId, keyId, paymentHash, providers, ctx)
-	getSignatureResult(t, instructionId, ctx)
+	instructionId := signTransaction(t, nodeId, walletId, keyId, paymentHash, providers)
+	getSignatureResult(t, instructionId)
 }
 
-func initializePolicy(t *testing.T, numPolicies int, providers *utils.Providers, ctx context.Context) {
+func initializePolicy(t *testing.T, numPolicies int, providers *utils.Providers) {
 	// initialize policy
 	epochId, randSeed := uint32(1), int64(12345)
 	initialPolicy := utils.GenerateRandomPolicyData(epochId, providers.Voters, randSeed)
@@ -101,10 +98,17 @@ func initializePolicy(t *testing.T, numPolicies int, providers *utils.Providers,
 
 	policySignaturesArray, err := utils.GenerateRandomMultiSignedPolicyArray(epochId, randSeed, providers.Voters, providers.PrivKeys, numPolicies)
 	require.NoError(t, err, "could not generate random policy policy")
-
+	pubKeys := make([]api.ECDSAPublicKey, len(providers.PrivKeys))
+	for i, voter := range providers.PrivKeys {
+		pubKeys[i] = api.ECDSAPublicKey{
+			X: voter.PublicKey.X.String(),
+			Y: voter.PublicKey.Y.String(),
+		}
+	}
 	req := &api.InitializePolicyRequest{
-		InitialPolicyBytes: initialPolicyBytes,
-		NewPolicyRequests:  policySignaturesArray,
+		InitialPolicyBytes:     initialPolicyBytes,
+		NewPolicyRequests:      policySignaturesArray,
+		LatestPolicyPublicKeys: pubKeys,
 	}
 
 	resp, err := utils.Post[api.InitializePolicyResponse](hostUrl+"/policies/initialize", req)
@@ -113,7 +117,7 @@ func initializePolicy(t *testing.T, numPolicies int, providers *utils.Providers,
 	logger.Infof("sent request to initialize policy, token %v", resp.Token)
 }
 
-func createWallet(t *testing.T, nodeId string, walletId string, keyId string, providers *utils.Providers, ctx context.Context) {
+func createWallet(t *testing.T, nodeId string, walletId string, keyId string, providers *utils.Providers) {
 
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 
@@ -140,7 +144,7 @@ func createWallet(t *testing.T, nodeId string, walletId string, keyId string, pr
 			providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		if err != nil {
 			log.Fatalf("could not initialize policy: %v", err)
@@ -153,7 +157,7 @@ func createWallet(t *testing.T, nodeId string, walletId string, keyId string, pr
 	}
 }
 
-func getNodeInfo(t *testing.T, ctx context.Context) (string, string) {
+func getNodeInfo(t *testing.T) (string, string) {
 	nonceBytes, err := utilsserver.GenerateRandomBytes(32)
 	require.NoError(t, err)
 
@@ -168,7 +172,7 @@ func getNodeInfo(t *testing.T, ctx context.Context) (string, string) {
 	return nodeResp.Data.Id, nodeResp.Data.EncryptionPublicKey
 }
 
-func getAddress(t *testing.T, walletId, keyId string, ctx context.Context) string {
+func getAddress(t *testing.T, walletId, keyId string) string {
 	instructionId, err := utilsserver.GenerateRandomBytes(32)
 	require.NoError(t, err)
 
@@ -185,8 +189,7 @@ func getAddress(t *testing.T, walletId, keyId string, ctx context.Context) strin
 	return pubKeyResp.EthAddress
 }
 
-func backupWallet(t *testing.T, nodeId string, walletId string, keyId string, backupId string, ids, backups, pubKeys []string, threshold int, providers *utils.Providers, ctx context.Context) {
-
+func backupWallet(t *testing.T, nodeId string, walletId string, keyId string, backupId string, ids, backups, pubKeys []string, threshold int, providers *utils.Providers) {
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		providerPrivKey := providers.PrivKeys[i]
@@ -226,7 +229,7 @@ func backupWallet(t *testing.T, nodeId string, walletId string, keyId string, ba
 			providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		if err != nil {
 			log.Fatalf("could not initialize policy: %v", err)
@@ -239,8 +242,7 @@ func backupWallet(t *testing.T, nodeId string, walletId string, keyId string, ba
 	}
 }
 
-func deleteWallet(t *testing.T, nodeId, walletId, keyId string, providers *utils.Providers, ctx context.Context) {
-
+func deleteWallet(t *testing.T, nodeId, walletId, keyId string, providers *utils.Providers) {
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		providerPrivKey := providers.PrivKeys[i]
@@ -264,7 +266,7 @@ func deleteWallet(t *testing.T, nodeId, walletId, keyId string, providers *utils
 			providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		if err != nil {
 			log.Fatalf("could not initialize policy: %v", err)
@@ -290,7 +292,7 @@ func deleteWallet(t *testing.T, nodeId, walletId, keyId string, providers *utils
 	require.Error(t, err)
 }
 
-func recoverWallet(t *testing.T, nodeId string, walletId string, keyId string, backupId string, address string, ids []string, backups []string, pubKey string, threshold int, providers *utils.Providers, ctx context.Context) {
+func recoverWallet(t *testing.T, nodeId string, walletId string, keyId string, backupId string, address string, ids []string, backups []string, pubKey string, threshold int, providers *utils.Providers) {
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		shareIds := make([]string, threshold)
@@ -341,7 +343,7 @@ func recoverWallet(t *testing.T, nodeId string, walletId string, keyId string, b
 			providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		if err != nil {
 			log.Fatalf("could not initialize policy: %v", err)
@@ -354,7 +356,7 @@ func recoverWallet(t *testing.T, nodeId string, walletId string, keyId string, b
 	}
 }
 
-func signTransaction(t *testing.T, nodeId, walletId, keyId, paymentHash string, providers *utils.Providers, ctx context.Context) string {
+func signTransaction(t *testing.T, nodeId, walletId, keyId, paymentHash string, providers *utils.Providers) string {
 	instructionId, _ := utilsserver.GenerateRandomBytes(32)
 	for i := range 2 {
 		providerPrivKey := providers.PrivKeys[i]
@@ -385,7 +387,7 @@ func signTransaction(t *testing.T, nodeId, walletId, keyId, paymentHash string, 
 			providerPrivKey,
 			nodeId,
 			hex.EncodeToString(instructionId),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 
 		if err != nil {
@@ -401,7 +403,7 @@ func signTransaction(t *testing.T, nodeId, walletId, keyId, paymentHash string, 
 	return hex.EncodeToString(instructionId)
 }
 
-func getSignatureResult(t *testing.T, instructionId string, ctx context.Context) {
+func getSignatureResult(t *testing.T, instructionId string) {
 	var resp api.InstructionResultResponse
 
 	instruction := api.InstructionResultRequest{

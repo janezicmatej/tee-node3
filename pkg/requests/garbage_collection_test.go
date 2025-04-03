@@ -174,7 +174,7 @@ func insertNRequests(t *testing.T, gbgCollector *requests.GarbageCollector, n in
 
 	for i := 0; i < n; i++ {
 		mockRequest := initMockRequest(epochId)
-		_reqHash, err := mockRequest.DataFixed.HashFixed()
+		_reqHash, err := mockRequest.HashFixed()
 		require.NoError(t, err)
 		requestHash := hex.EncodeToString(_reqHash[:])
 
@@ -182,7 +182,7 @@ func insertNRequests(t *testing.T, gbgCollector *requests.GarbageCollector, n in
 
 		gbgCollector.TrackRequest(requestHash, proposer)
 
-		requestCounter := requests.CreateAndStoreRequestCounter(&mockRequest, proposer)
+		requestCounter := requests.CreateAndStoreRequestCounter(&mockRequest, proposer, -1)
 
 		if completed {
 			requestCounter.Done = true
