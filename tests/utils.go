@@ -29,18 +29,26 @@ import (
 	api "tee-node/api/types"
 )
 
-func GenerateRandomValidPolicyAndSigners(epochId uint32, randSeed int64, numVoters int) (*policy.SigningPolicy, []byte, []common.Address, []*ecdsa.PrivateKey, error) {
+func GenerateRandomValidPolicyAndSigners(epochId uint32, randSeed int64, numVoters int) (*policy.SigningPolicy, []byte, []common.Address, []*ecdsa.PrivateKey, []api.ECDSAPublicKey, error) {
 	// Generate random voters and corresponding private keys
-	voters, privKeys := GenerateRandomVoters(numVoters)
+	voters, privKeys, pubKeysMap := GenerateRandomVoters(numVoters)
 
 	initialPolicy := GenerateRandomPolicyData(epochId, voters, randSeed)
 
 	initialPolicyBytes, err := policy.EncodeSigningPolicy(&initialPolicy)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	return &initialPolicy, initialPolicyBytes, voters, privKeys, nil
+	pubKeys := make([]api.ECDSAPublicKey, len(voters))
+	for i, voter := range voters {
+		pubKeys[i] = api.ECDSAPublicKey{
+			X: pubKeysMap[voter].X.String(),
+			Y: pubKeysMap[voter].Y.String(),
+		}
+	}
+
+	return &initialPolicy, initialPolicyBytes, voters, privKeys, pubKeys, nil
 }
 
 func GenerateRandomMultiSignedPolicyArray(epochId uint32, randSeed int64, voters []common.Address, privKeys []*ecdsa.PrivateKey, numPolicies int) ([]api.MultiSignedPolicy, error) {
@@ -50,7 +58,6 @@ func GenerateRandomMultiSignedPolicyArray(epochId uint32, randSeed int64, voters
 	_epochId, _randSeed := epochId, randSeed
 
 	for i := 0; i < numPolicies; i++ {
-
 		_epochId++
 		_randSeed++
 		nextPolicy := GenerateRandomPolicyData(_epochId, voters, _randSeed)
@@ -72,7 +79,7 @@ func BuildMultiSignedPolicy(policyBytes []byte, voterPrivKeys []*ecdsa.PrivateKe
 
 	for _, voterPrivKey := range voterPrivKeys {
 		// sig, err := policy.SignNewSigningPolicy(policy.SigningPolicyHash(policyBytes), voterPrivKeys[i])
-		sig, err := utils.Sign(policy.SigningPolicyHash(policyBytes), voterPrivKey)
+		sig, err := utils.Sign(policy.SigningPolicyBytesToHash(policyBytes), voterPrivKey)
 		if err != nil {
 			panic(err)
 		}
@@ -94,9 +101,10 @@ func BuildMultiSignedPolicy(policyBytes []byte, voterPrivKeys []*ecdsa.PrivateKe
 }
 
 // Always returns the same voters and private keys
-func GenerateRandomVoters(numVoters int) ([]common.Address, []*ecdsa.PrivateKey) {
+func GenerateRandomVoters(numVoters int) ([]common.Address, []*ecdsa.PrivateKey, map[common.Address]*ecdsa.PublicKey) {
 	Voters := make([]common.Address, numVoters)
 	privKeys := make([]*ecdsa.PrivateKey, numVoters)
+	pubKeys := make(map[common.Address]*ecdsa.PublicKey)
 
 	for i := 0; i < numVoters; i++ {
 		voterPrivKey, err := utils.GenerateEthereumPrivateKey()
@@ -107,9 +115,10 @@ func GenerateRandomVoters(numVoters int) ([]common.Address, []*ecdsa.PrivateKey)
 
 		privKeys[i] = voterPrivKey
 		Voters[i] = utils.PubkeyToAddress(&voterPubKey)
+		pubKeys[Voters[i]] = &voterPubKey
 	}
 
-	return Voters, privKeys
+	return Voters, privKeys, pubKeys
 
 }
 
@@ -205,7 +214,7 @@ func RandomNormalizedArray(n int, seed int64) []float64 {
 
 // Resets the state of the TEE between tests
 func ResetTEEState() {
-	policy.DestoryState()
+	policy.DestroyState()
 	requests.DestroyState()
 	requests.DestroyGarbageCollector()
 	requests.ClearRateLimiterState()
@@ -218,14 +227,14 @@ func ResetTEEState() {
 // We need this to make the tests work for randomly generated policies
 func SetMockInitialPolicy(initialPolicyBytes []byte) {
 	// Set the initial policy hash in the config
-	config.InitialPolicyHash = hex.EncodeToString(policy.SigningPolicyHash(initialPolicyBytes))
+	config.InitialPolicyHash = hex.EncodeToString(policy.SigningPolicyBytesToHash(initialPolicyBytes))
 }
 
 // This will construct a Mock Signing Policy, set it on the Tee and return the policy
 func GenerateAndSetInitialPolicy(numVoters int, randSeed int64, epochId uint32) (policy.SigningPolicy, []common.Address, []*ecdsa.PrivateKey) {
 
 	// Generate random voters and corresponding private keys
-	voters, privKeys := GenerateRandomVoters(numVoters)
+	voters, privKeys, pubKeys := GenerateRandomVoters(numVoters)
 
 	// Generate a random initial policy
 	initialPolicy := GenerateRandomPolicyData(epochId, voters, randSeed)
@@ -236,7 +245,8 @@ func GenerateAndSetInitialPolicy(numVoters int, randSeed int64, epochId uint32) 
 	SetMockInitialPolicy(initialPolicyBytes)
 
 	// Set the Active Signing Policy
-	policy.SetSigningPolicy(&initialPolicy, policy.SigningPolicyHash(initialPolicyBytes))
+	policy.SetActiveSigningPolicy(&initialPolicy)
+	policy.SetActiveSigningPolicyPublicKeys(pubKeys)
 
 	// Register the validators for the rate limiter
 	requests.UpdateRateLimiter(voters)

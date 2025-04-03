@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"sync"
+	"tee-node/pkg/config"
 	"tee-node/pkg/policy"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,7 +22,7 @@ func init() {
 type RequestCounterStorage struct {
 	Storage map[string]*RequestCounter
 
-	sync.Mutex
+	sync.RWMutex
 }
 
 type RequestCounter struct {
@@ -76,11 +77,11 @@ func RemoveRequestCounterByHash(requestHash string) {
 	delete(requestCounterStorage.Storage, requestHash)
 }
 
-func CreateAndStoreRequestCounter(request *instruction.Data, proposer common.Address) *RequestCounter {
+func CreateAndStoreRequestCounter(request *instruction.Data, proposer common.Address, threshold int) *RequestCounter {
 	hash, _ := request.HashFixed() // TODO: handle error? I think this is checked implicitly before this call
 	requestHash := hex.EncodeToString(hash[:])
 
-	requestCounter := NewRequestCounter(request, proposer)
+	requestCounter := NewRequestCounter(request, proposer, threshold)
 
 	requestCounterStorage.Lock()
 	requestCounterStorage.Storage[requestHash] = requestCounter
@@ -89,14 +90,21 @@ func CreateAndStoreRequestCounter(request *instruction.Data, proposer common.Add
 	return requestCounter
 }
 
-func NewRequestCounter(request *instruction.Data, proposer common.Address) *RequestCounter {
+func NewRequestCounter(request *instruction.Data, proposer common.Address, threshold int) *RequestCounter {
 	requestPolicy := policy.GetSigningPolicy(uint32(request.RewardEpochID.Uint64()))
-	threshold := requestPolicy.Threshold // todo: for now just read from policy
+	var thresholdUint16 uint16
+	switch threshold {
+	case config.ThresholdSetByPolicy:
+		thresholdUint16 = requestPolicy.Threshold
+
+	default:
+		thresholdUint16 = uint16(threshold)
+	}
 
 	return &RequestCounter{
 		Request:                 &request.DataFixed,
 		RequestPolicy:           requestPolicy,
-		Threshold:               threshold,
+		Threshold:               thresholdUint16,
 		RequestSignatures:       make(map[common.Address][]byte),
 		RequestVariableMessages: make(map[common.Address][]byte),
 		Proposer:                proposer,
@@ -104,9 +112,12 @@ func NewRequestCounter(request *instruction.Data, proposer common.Address) *Requ
 }
 
 // Check that the request policy is still active, meaning either the active policy or the withing the 5 minute transition period
+// TODO: not used any more?
 func (r *RequestCounter) CheckActive() error {
+	activeSigningPolicy := policy.GetActiveSigningPolicy()
+
 	rewardEpochId := r.RequestPolicy.RewardEpochId
-	activePolicyId := policy.ActiveSigningPolicy.RewardEpochId
+	activePolicyId := activeSigningPolicy.RewardEpochId
 
 	if rewardEpochId == activePolicyId || rewardEpochId == activePolicyId-1 {
 		return nil

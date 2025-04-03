@@ -5,6 +5,7 @@ import (
 	"strconv"
 	api "tee-node/api/types"
 	"tee-node/pkg/attestation"
+	"tee-node/pkg/config"
 	"tee-node/pkg/requests"
 	"tee-node/pkg/utils"
 
@@ -17,8 +18,6 @@ import (
 // Call forwards the call to the appropriate service and method
 func SendSignedInstruction(instructionMessage *instruction.Instruction) (*api.InstructionResponse, error) {
 	// TODO: Is there any other check that should be done here?
-	// Todo: Checks if InstructionId is valid, rewardEpochId is correct, etc.
-	// TODO: Anti DOS checks
 	inActivePolicy, err := requests.CheckRequest(&instructionMessage.Data)
 	if err != nil {
 		return nil, err
@@ -35,7 +34,7 @@ func SendSignedInstruction(instructionMessage *instruction.Instruction) (*api.In
 	}
 
 	// Check if the request is a new request proposal and if so, is the signer allowed to propose
-	reqHashFixed, err := instructionMessage.Data.DataFixed.HashFixed()
+	reqHashFixed, err := instructionMessage.Data.HashFixed()
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +52,11 @@ func SendSignedInstruction(instructionMessage *instruction.Instruction) (*api.In
 			return nil, err
 		}
 		requests.RequestGarbageCollector.TrackRequest(reqHash, signer) // Track the request for garbage collection
-		requestCounter = requests.CreateAndStoreRequestCounter(&instructionMessage.Data, signer)
+		requestCounter = requests.CreateAndStoreRequestCounter(
+			&instructionMessage.Data,
+			signer,
+			config.Thresholds[utils.OpHashToString(instructionMessage.Data.OPType)][utils.OpHashToString(instructionMessage.Data.OPCommand)],
+		)
 	} else {
 		var exists bool
 		requestCounter, exists = requests.GetRequestCounterByHash(reqHash)

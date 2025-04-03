@@ -2,7 +2,9 @@ package policy
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
+	"math/big"
 
 	api "tee-node/api/types"
 	pd "tee-node/pkg/policy"
@@ -12,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flare-foundation/go-flare-common/pkg/contracts/registry"
 	"github.com/flare-foundation/go-flare-common/pkg/contracts/relay"
 	"github.com/flare-foundation/go-flare-common/pkg/contracts/system"
 	"github.com/flare-foundation/go-flare-common/pkg/database"
@@ -23,11 +26,14 @@ import (
 type PolicyHistoryParams struct {
 	RelayContractAddress              common.Address
 	FlareSystemManagerContractAddress common.Address
+	FlareVoterRegistryContractAddress common.Address
 }
 
 const (
 	signNewSigningPolicy = "signNewSigningPolicy"
+	registerVoter        = "registerVoter"
 	maxInt               = int64(^uint64(0) >> 1)
+	maxUInt              = ^uint64(0)
 )
 
 var (
@@ -36,14 +42,18 @@ var (
 	systemABI                        *abi.ABI
 	signNewSigningPolicyAbiArgs      abi.Arguments
 	signNewSigningPolicyFuncSel      [4]byte
+	voterRegisteredEventSel          common.Hash
+	registerVoterFuncSel             [4]byte
+	registerVoterAbiArgs             abi.Arguments
+	uint24Ty, _                      = abi.NewType("uint24", "", nil)
+	addressTy, _                     = abi.NewType("address", "", nil)
 )
 
 func init() {
 	relayABI, err := relay.RelayMetaData.GetAbi()
 	if err != nil {
-		logger.Panic("cannot get relayAby:", err)
+		logger.Panic("cannot get relay Abi:", err)
 	}
-
 	signingPolicyEvent, ok := relayABI.Events["SigningPolicyInitialized"]
 	if !ok {
 		logger.Panic("cannot get SigningPolicyInitialized event:", err)
@@ -55,8 +65,19 @@ func init() {
 		logger.Panic("cannot get submission ABI:", err)
 	}
 	copy(signNewSigningPolicyFuncSel[:], systemABI.Methods[signNewSigningPolicy].ID[:4])
-
 	signNewSigningPolicyAbiArgs = systemABI.Methods[signNewSigningPolicy].Inputs
+
+	voterRegistryABI, err := registry.RegistryMetaData.GetAbi()
+	if err != nil {
+		logger.Panic("cannot get registry abi:", err)
+	}
+	voterRegisteredEvent, ok := voterRegistryABI.Events["VoterRegistered"]
+	if !ok {
+		logger.Panic("cannot get VoterRegistered event:", err)
+	}
+	voterRegisteredEventSel = voterRegisteredEvent.ID
+	copy(registerVoterFuncSel[:], voterRegistryABI.Methods[registerVoter].ID[:4])
+	registerVoterAbiArgs = voterRegistryABI.Methods[registerVoter].Inputs
 }
 
 // FetchPolicyHistory extracts all the data involving policies from the database
@@ -137,12 +158,12 @@ type PolicySignature struct {
 	PubKey []byte
 }
 
-func CreateSigningRequest(policies []*relay.RelaySigningPolicyInitialized, signatures map[string][]*PolicySignature) (*api.InitializePolicyRequest, error) {
+func CreateInitializePolicyRequest(policies []*relay.RelaySigningPolicyInitialized, signatures map[string][]*PolicySignature, pubKeysMap map[common.Address]*ecdsa.PublicKey) (*api.InitializePolicyRequest, error) {
 	policyRequests := []api.MultiSignedPolicy{}
 
 	// Replay policy signing from the second policy onwards
 	for _, policy := range policies[1:] {
-		policyHash := hex.EncodeToString(pd.SigningPolicyHash(policy.SigningPolicyBytes))
+		policyHash := hex.EncodeToString(pd.SigningPolicyBytesToHash(policy.SigningPolicyBytes))
 		policySignatures := signatures[policyHash]
 		policyDecoded, err := pd.DecodeSigningPolicy(policy.SigningPolicyBytes)
 		if err != nil {
@@ -178,10 +199,116 @@ func CreateSigningRequest(policies []*relay.RelaySigningPolicyInitialized, signa
 
 		policyRequests = append(policyRequests, signNewPolicyRequest)
 	}
+
+	pubKeys := make([]api.ECDSAPublicKey, len(policies[len(policies)-1].Voters))
+	for i, voter := range policies[len(policies)-1].Voters {
+		pubKeys[i] = api.ECDSAPublicKey{
+			X: pubKeysMap[voter].X.String(),
+			Y: pubKeysMap[voter].Y.String(),
+		}
+	}
+
 	req := &api.InitializePolicyRequest{
-		InitialPolicyBytes: policies[0].SigningPolicyBytes,
-		NewPolicyRequests:  policyRequests,
+		InitialPolicyBytes:     policies[0].SigningPolicyBytes,
+		NewPolicyRequests:      policyRequests,
+		LatestPolicyPublicKeys: pubKeys,
 	}
 
 	return req, nil
+}
+
+func FetchVoterRegisteredBlocksInfo(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB, rewardEpochId int) (uint64, uint64, error) {
+	logsParams := database.LogsParams{
+		Address: params.FlareVoterRegistryContractAddress,
+		Topic0:  voterRegisteredEventSel,
+		From:    0,
+		To:      maxInt,
+	}
+
+	logs, err := database.FetchLogsByAddressAndTopic0Timestamp(
+		ctx, db, logsParams,
+	)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	minBlockNum := maxUInt
+	maxBlockNum := uint64(0)
+	for _, log := range logs {
+		event, err := common_policy.ParseVoterRegisteredEvent(log)
+		if err != nil {
+			return 0, 0, err
+		}
+		if event.RewardEpochId.Int64() == int64(rewardEpochId) {
+			if log.BlockNumber < minBlockNum {
+				minBlockNum = log.BlockNumber
+			}
+			if log.BlockNumber > maxBlockNum {
+				maxBlockNum = log.BlockNumber
+			}
+		}
+	}
+
+	return minBlockNum, maxBlockNum, nil
+}
+
+func FetchVotersPublicKeysMap(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB, minBlockNum, maxBlockNum uint64, rewardEpochId int) (map[common.Address]*ecdsa.PublicKey, error) {
+	txsParams := database.TxParams{
+		ToAddress:   params.FlareVoterRegistryContractAddress,
+		FunctionSel: registerVoterFuncSel,
+		From:        int64(minBlockNum) - 1,
+		To:          int64(maxBlockNum),
+	}
+	txs, err := database.FetchTransactionsByAddressAndSelectorBlockNumber(
+		ctx, db, txsParams,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	addressToPubKey := make(map[common.Address]*ecdsa.PublicKey)
+	for _, tx := range txs {
+		inputBytes, err := hex.DecodeString(tx.Input)
+		if err != nil {
+			return nil, err
+		}
+		inputBytes = inputBytes[4:]
+
+		registerVoterInputBytesArray, err := registerVoterAbiArgs.Unpack(inputBytes)
+		if err != nil {
+			return nil, err
+		}
+		if len(registerVoterInputBytesArray) != 2 {
+			return nil, err
+		}
+
+		voterAddress := *abi.ConvertType(registerVoterInputBytesArray[0], new(common.Address)).(*common.Address)
+		signature := *abi.ConvertType(registerVoterInputBytesArray[1], new(registry.IVoterRegistrySignature)).(*registry.IVoterRegistrySignature)
+
+		sigBytes := make([]byte, 65)
+		copy(sigBytes[0:32], signature.R[:])
+		copy(sigBytes[32:64], signature.S[:])
+		sigBytes[64] = signature.V - 27
+
+		arguments := abi.Arguments{{Type: uint24Ty}, {Type: addressTy}}
+
+		toHash, err := arguments.Pack(big.NewInt(int64(rewardEpochId)), voterAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		pubKeyBytes, err := crypto.Ecrecover(accounts.TextHash(crypto.Keccak256(toHash)), sigBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		pubKey, err := crypto.UnmarshalPubkey(pubKeyBytes)
+		if err != nil {
+			return nil, err
+		}
+		signingAddress := crypto.PubkeyToAddress(*pubKey)
+		addressToPubKey[signingAddress] = pubKey
+	}
+
+	return addressToPubKey, nil
 }

@@ -3,6 +3,7 @@ package policy
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -16,31 +17,33 @@ import (
 	ps "tee-node/pkg/service/policyservice"
 )
 
+var params = &PolicyHistoryParams{
+	RelayContractAddress:              common.HexToAddress("0x5A0773Ff307Bf7C71a832dBB5312237fD3437f9F"),
+	FlareSystemManagerContractAddress: common.HexToAddress("0xa4bcDF64Cdd5451b6ac3743B414124A6299B65FF"),
+	FlareVoterRegistryContractAddress: common.HexToAddress("0xB00cC45B4a7d3e1FEE684cFc4417998A1c183e6d"),
+}
+
 // TestFetchPolicyHistory assumes that a DB with indexed txs and logs
 // needed to obtain policies.
 func TestFetchPolicyHistory(t *testing.T) {
-	dbConfig := &database.Config{Host: "localhost", Port: 3306, Database: "flare_ftso_indexer_tee_node", Username: "root", Password: "root"}
+	dbConfig := &database.Config{Host: "localhost", Port: 3306, Database: "db", Username: "root", Password: "root"}
 
 	db, err := database.Connect(dbConfig)
 	require.NoError(t, err)
 
-	params := PolicyHistoryParams{RelayContractAddress: common.HexToAddress("0x97702e350CaEda540935d92aAf213307e9069784"), FlareSystemManagerContractAddress: common.HexToAddress("0xA90Db6D10F856799b10ef2A77EBCbF460aC71e52")}
-
-	policies, signatures, err := FetchPolicyHistory(context.Background(), &params, db)
+	policies, signatures, err := FetchPolicyHistory(context.Background(), params, db)
 	require.NoError(t, err)
 	_ = policies
 	_ = signatures
 }
 
 func TestPolicyDecodingEncoding(t *testing.T) {
-	dbConfig := &database.Config{Host: "localhost", Port: 3306, Database: "flare_ftso_indexer_tee_node", Username: "root", Password: "root"}
+	dbConfig := &database.Config{Host: "localhost", Port: 3306, Database: "db", Username: "root", Password: "root"}
 
 	db, err := database.Connect(dbConfig)
 	require.NoError(t, err)
 
-	params := PolicyHistoryParams{RelayContractAddress: common.HexToAddress("0x97702e350CaEda540935d92aAf213307e9069784"), FlareSystemManagerContractAddress: common.HexToAddress("0xA90Db6D10F856799b10ef2A77EBCbF460aC71e52")}
-
-	policies, _, err := FetchPolicyHistory(context.Background(), &params, db)
+	policies, _, err := FetchPolicyHistory(context.Background(), params, db)
 	require.NoError(t, err)
 
 	// Test encoding and decoding of the last available policy
@@ -77,21 +80,51 @@ func TestPolicyDecodingEncoding(t *testing.T) {
 }
 
 func TestPolicyReplayingWithIndexerData(t *testing.T) {
-	dbConfig := &database.Config{Host: "localhost", Port: 3306, Database: "flare_ftso_indexer_tee_node", Username: "root", Password: "root"}
+	dbConfig := &database.Config{Host: "localhost", Port: 3306, Database: "db", Username: "root", Password: "root"}
 
 	db, err := database.Connect(dbConfig)
 	require.NoError(t, err)
 
-	params := PolicyHistoryParams{RelayContractAddress: common.HexToAddress("0x97702e350CaEda540935d92aAf213307e9069784"), FlareSystemManagerContractAddress: common.HexToAddress("0xA90Db6D10F856799b10ef2A77EBCbF460aC71e52")}
+	policies, signatures, err := FetchPolicyHistory(context.Background(), params, db)
+	require.NoError(t, err)
+	require.Greater(t, len(policies), 0)
 
-	policies, signatures, err := FetchPolicyHistory(context.Background(), &params, db)
+	activePolicyRewardEpoch := int(policies[len(policies)-1].RewardEpochId.Int64())
+	minBlockNum, maxBlockNum, err := FetchVoterRegisteredBlocksInfo(context.Background(), params, db, activePolicyRewardEpoch)
+	require.NoError(t, err)
+	pubKeysMap, err := FetchVotersPublicKeysMap(context.Background(), params, db, minBlockNum, maxBlockNum, activePolicyRewardEpoch)
 	require.NoError(t, err)
 
-	req, err := CreateSigningRequest(policies, signatures)
+	req, err := CreateInitializePolicyRequest(policies, signatures, pubKeysMap)
 	require.NoError(t, err)
 
-	config.InitialPolicyHash = hex.EncodeToString(pd.SigningPolicyHash(req.InitialPolicyBytes))
+	config.InitialPolicyHash = hex.EncodeToString(pd.SigningPolicyBytesToHash(req.InitialPolicyBytes))
 
 	_, err = ps.InitializePolicy(req)
 	require.NoError(t, err)
+}
+
+func TestPublicKeys(t *testing.T) {
+	dbConfig := &database.Config{Host: "localhost", Port: 3306, Database: "db", Username: "root", Password: "root"}
+
+	db, err := database.Connect(dbConfig)
+	require.NoError(t, err)
+
+	params := PolicyHistoryParams{
+		RelayContractAddress:              common.HexToAddress("0x97702e350CaEda540935d92aAf213307e9069784"),
+		FlareSystemManagerContractAddress: common.HexToAddress("0xA90Db6D10F856799b10ef2A77EBCbF460aC71e52"),
+		FlareVoterRegistryContractAddress: common.HexToAddress("0xB00cC45B4a7d3e1FEE684cFc4417998A1c183e6d"),
+	}
+
+	rewardEpochId := 1
+	minBlockNum, maxBlockNum, err := FetchVoterRegisteredBlocksInfo(context.Background(), &params, db, rewardEpochId)
+	require.NoError(t, err)
+	_ = minBlockNum
+	_ = maxBlockNum
+
+	addressToPubKey, err := FetchVotersPublicKeysMap(context.Background(), &params, db, minBlockNum, maxBlockNum, rewardEpochId)
+	require.NoError(t, err)
+
+	_ = addressToPubKey
+	fmt.Println(addressToPubKey)
 }

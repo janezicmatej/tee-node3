@@ -53,7 +53,7 @@ func TestInvalidRequestSignature(t *testing.T) {
 	wrongSig, err := requests.Sign(&instruction.Data, wrongPrivKey)
 	require.NoError(t, err)
 
-	_, err = requests.CheckSignature(&instruction.Data, wrongSig, policy.ActiveSigningPolicy)
+	_, err = requests.CheckSignature(&instruction.Data, wrongSig, policy.GetActiveSigningPolicy())
 
 	if assert.Error(t, err) {
 		assert.Equal(t, "not a voter", err.Error())
@@ -88,7 +88,7 @@ func TestRequestCheckActive(t *testing.T) {
 		privKeys[0],
 		node.GetNodeId().Id,
 		hex.EncodeToString(instructionIdBytes),
-		1,
+		epochId,
 	)
 	require.NoError(t, err)
 
@@ -99,10 +99,9 @@ func TestRequestCheckActive(t *testing.T) {
 	require.NoError(t, err)
 
 	// Increase the reward epoch id by 1
-	sigPolicy.RewardEpochId += 1
+	sigPolicy.RewardEpochId += 2
 
-	policyBytes, _ := policy.EncodeSigningPolicy(&sigPolicy)
-	policy.SetSigningPolicy(&sigPolicy, policy.SigningPolicyHash(policyBytes))
+	policy.SetActiveSigningPolicy(&sigPolicy)
 
 	_, err = requests.CheckRequest(&instruction.Data)
 	if assert.Error(t, err) {

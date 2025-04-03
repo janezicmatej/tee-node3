@@ -41,7 +41,7 @@ func TestSendManyPaymentInstructions(t *testing.T) {
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
-	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
+	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.GetActiveSigningPolicy().RewardEpochId)
 
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
 
@@ -60,7 +60,7 @@ func TestSendManyPaymentInstructions(t *testing.T) {
 			privKeys[i],
 			myNodeId.Id,
 			hex.EncodeToString(instructionIdBytes),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		require.NoError(t, err)
 
@@ -91,11 +91,11 @@ func TestGetInstructionResult(t *testing.T) {
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
-	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
+	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.GetActiveSigningPolicy().RewardEpochId)
 
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
 
-	thresholdIdx, _ := testutils.GetTresholdRechedVoterIndex(policy.ActiveSigningPolicy, privKeys)
+	thresholdIdx, _ := testutils.GetTresholdRechedVoterIndex(policy.GetActiveSigningPolicy(), privKeys)
 
 	instructionIdBytes, _ := utils.GenerateRandomBytes(32)
 
@@ -111,7 +111,7 @@ func TestGetInstructionResult(t *testing.T) {
 			}, privKeys[i],
 			myNodeId.Id,
 			hex.EncodeToString(instructionIdBytes),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		require.NoError(t, err)
 
@@ -154,7 +154,7 @@ func TestGetInstructionResult(t *testing.T) {
 		privKeys[thresholdIdx],
 		myNodeId.Id,
 		hex.EncodeToString(instructionIdBytes),
-		policy.ActiveSigningPolicy.RewardEpochId,
+		policy.GetActiveSigningPolicy().RewardEpochId,
 	)
 	require.NoError(t, err)
 
@@ -181,11 +181,11 @@ func TestGetInstructionStatus(t *testing.T) {
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
-	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
+	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.GetActiveSigningPolicy().RewardEpochId)
 
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
 
-	thresholdIdx, thresholdWeight := testutils.GetTresholdRechedVoterIndex(policy.ActiveSigningPolicy, privKeys)
+	thresholdIdx, thresholdWeight := testutils.GetTresholdRechedVoterIndex(policy.GetActiveSigningPolicy(), privKeys)
 
 	instructionIdBytes, _ := utils.GenerateRandomBytes(32)
 
@@ -201,7 +201,7 @@ func TestGetInstructionStatus(t *testing.T) {
 			privKeys[i],
 			myNodeId.Id,
 			hex.EncodeToString(instructionIdBytes),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		require.NoError(t, err)
 
@@ -239,7 +239,7 @@ func TestGetInstructionStatus(t *testing.T) {
 		privKeys[thresholdIdx],
 		myNodeId.Id,
 		hex.EncodeToString(instructionIdBytes),
-		policy.ActiveSigningPolicy.RewardEpochId,
+		policy.GetActiveSigningPolicy().RewardEpochId,
 	)
 	require.NoError(t, err)
 
@@ -271,7 +271,7 @@ func TestGetResultWithDifferentInstructionForSameId(t *testing.T) {
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
-	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.ActiveSigningPolicy.RewardEpochId)
+	testutils.CreateMockWallet(t, myNodeId.Id, mockWalletId, mockKeyId, privKeys, policy.GetActiveSigningPolicy().RewardEpochId)
 
 	paymentHash1 := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
 	paymentHash2 := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
@@ -279,7 +279,7 @@ func TestGetResultWithDifferentInstructionForSameId(t *testing.T) {
 
 	instructionIdBytes, _ := utils.GenerateRandomBytes(32)
 
-	thresholdIdx, thresholdWeight := testutils.GetTresholdRechedVoterIndex(policy.ActiveSigningPolicy, privKeys)
+	thresholdIdx, thresholdWeight := testutils.GetTresholdRechedVoterIndex(policy.GetActiveSigningPolicy(), privKeys)
 
 	var instruction *instruction.Instruction
 	// Loop up to the threshold index and sign the first payment hash
@@ -295,11 +295,11 @@ func TestGetResultWithDifferentInstructionForSameId(t *testing.T) {
 			privKeys[i],
 			myNodeId.Id,
 			hex.EncodeToString(instructionIdBytes),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		require.NoError(t, err)
 
-		voterWeight1 += int(testutils.GetSignerWeight(&privKeys[i].PublicKey, policy.ActiveSigningPolicy))
+		voterWeight1 += int(testutils.GetSignerWeight(&privKeys[i].PublicKey, policy.GetActiveSigningPolicy()))
 
 		response, err := instructionservice.SendSignedInstruction(instruction)
 
@@ -328,11 +328,11 @@ func TestGetResultWithDifferentInstructionForSameId(t *testing.T) {
 			privKeys[i],
 			myNodeId.Id,
 			hex.EncodeToString(instructionIdBytes),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		require.NoError(t, err)
 
-		voterWeight2 += int(testutils.GetSignerWeight(&privKeys[i].PublicKey, policy.ActiveSigningPolicy))
+		voterWeight2 += int(testutils.GetSignerWeight(&privKeys[i].PublicKey, policy.GetActiveSigningPolicy()))
 
 		response, err := instructionservice.SendSignedInstruction(instruction)
 
@@ -358,11 +358,11 @@ func TestGetResultWithDifferentInstructionForSameId(t *testing.T) {
 			privKeys[i],
 			myNodeId.Id,
 			hex.EncodeToString(instructionIdBytes),
-			policy.ActiveSigningPolicy.RewardEpochId,
+			policy.GetActiveSigningPolicy().RewardEpochId,
 		)
 		require.NoError(t, err)
 
-		voterWeight3 += int(testutils.GetSignerWeight(&privKeys[i].PublicKey, policy.ActiveSigningPolicy))
+		voterWeight3 += int(testutils.GetSignerWeight(&privKeys[i].PublicKey, policy.GetActiveSigningPolicy()))
 
 		response, err := instructionservice.SendSignedInstruction(instruction)
 
@@ -414,7 +414,7 @@ func TestGetResultWithDifferentInstructionForSameId(t *testing.T) {
 		privKeys[thresholdIdx],
 		myNodeId.Id,
 		hex.EncodeToString(instructionIdBytes),
-		policy.ActiveSigningPolicy.RewardEpochId,
+		policy.GetActiveSigningPolicy().RewardEpochId,
 	)
 	require.NoError(t, err)
 
@@ -449,62 +449,67 @@ func TestGetResultWithDifferentInstructionForSameId(t *testing.T) {
 
 func TestSignNewPolicy(t *testing.T) {
 	defer testutils.ResetTEEState() // Reset the state of the TEE after the test
+	err := node.InitNode()
+	require.NoError(t, err)
 	myNodeId := node.GetNodeId()
 
 	epochId, randSeed := uint32(1), int64(12345)
 
 	numVoters := 100
-	_, initialPolicyBytes, voters, privKeys, err := testutils.GenerateRandomValidPolicyAndSigners(epochId, randSeed, numVoters)
+	_, initialPolicyBytes, voters, privKeys, pubKeys, err := testutils.GenerateRandomValidPolicyAndSigners(epochId, randSeed, numVoters)
 	if err != nil {
-		t.Errorf("Failed to generate the initial policy")
+		t.Fatalf("Failed to generate the initial policy")
 	}
 
 	// Set the initial policy hash in the config
 	testutils.SetMockInitialPolicy(initialPolicyBytes)
 
 	req := &api.InitializePolicyRequest{
-		InitialPolicyBytes: initialPolicyBytes,
-		NewPolicyRequests:  nil,
+		InitialPolicyBytes:     initialPolicyBytes,
+		NewPolicyRequests:      nil,
+		LatestPolicyPublicKeys: pubKeys,
 	}
 
 	_, err = policyservice.InitializePolicy(req)
 	if err != nil {
-		t.Errorf("Failed to initialize the policy: %v", err)
+		t.Fatalf("Failed to initialize the policy: %v", err)
 	}
 
 	numPolicies := 1
 	policySignaturesArray, err := testutils.GenerateRandomMultiSignedPolicyArray(epochId, randSeed, voters, privKeys, numPolicies)
 	if err != nil {
-		t.Errorf("Failed to generate the policy signatures")
+		t.Fatalf("Failed to generate the policy signatures")
 	}
 	instructionIdBytes, _ := utils.GenerateRandomBytes(32)
+	// Sign the instruction with one signer
+	instruction, err := testutils.BuildMockInstruction("POLICY",
+		"UPDATE_POLICY",
+		// originalMessage empty for now
+		[]byte{},
+		// entire MultiSignedPolicy struct encoded in AdditionalFixedMessage
+		api.UpdatePolicyRequest{
+			NewPolicyRequest:       policySignaturesArray[0],
+			LatestPolicyPublicKeys: pubKeys,
+		},
+		privKeys[0],
+		myNodeId.Id,
+		hex.EncodeToString(instructionIdBytes),
+		epochId,
+	)
+	require.NoError(t, err)
+	_, err = instructionservice.SendSignedInstruction(instruction)
 
-	for i := 0; i < len(privKeys); i++ {
-		// Sign the payment hash with the last voter to reach the threshold for the first payment hash
-		instruction, err := testutils.BuildMockInstruction("POLICY",
-			"UPDATE_POLICY",
-			// originalMessage empty for now
-			[]byte{},
-			// entire MultiSignedPolicy struct encoded in AdditionalFixedMessage
-			policySignaturesArray[0],
-			privKeys[i],
-			myNodeId.Id,
-			hex.EncodeToString(instructionIdBytes),
-			policy.ActiveSigningPolicy.RewardEpochId,
-		)
-		require.NoError(t, err)
-		_, err = instructionservice.SendSignedInstruction(instruction)
-
-		if err != nil {
-			t.Fatalf("Failed to sign the payment transaction: %v", err)
-		}
+	if err != nil {
+		t.Fatalf("Failed to update policy: %v", err)
 	}
 	// * ----------------------------------------------------------------
 
 	// prevPolicyHashString := hex.EncodeToString(policy.SigningPolicyHash(initialPolicyBytes))
-	newPolicyHashString := hex.EncodeToString(policy.SigningPolicyHash(policySignaturesArray[0].PolicyBytes))
+	newPolicyHashString := hex.EncodeToString(policy.SigningPolicyBytesToHash(policySignaturesArray[0].PolicyBytes))
+	activePolicyHash, err := policy.SigningPolicyToHash(policy.GetActiveSigningPolicy())
+	require.NoError(t, err)
 
-	require.Equal(t, newPolicyHashString, hex.EncodeToString(policy.ActiveSigningPolicyHash))
+	require.Equal(t, newPolicyHashString, hex.EncodeToString(activePolicyHash))
 }
 
 func TestDecodeAbiInstruction(t *testing.T) {

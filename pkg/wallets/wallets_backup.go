@@ -9,8 +9,10 @@ import (
 	"sync"
 	api "tee-node/api/types"
 	"tee-node/pkg/attestation"
+	"tee-node/pkg/config"
 	"tee-node/pkg/node"
 	"tee-node/pkg/requests"
+	"tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -131,7 +133,7 @@ type shareInfo struct {
 func (s shareInfo) Check(myNodeId, outNodeId string) error {
 	instructionData := &instruction.Data{DataFixed: s.InstructionData, AdditionalVariableMessage: []byte("")} // variable part is empty
 
-	requestCounter := requests.NewRequestCounter(instructionData, common.Address{})
+	requestCounter := requests.NewRequestCounter(instructionData, common.Address{}, config.Thresholds[utils.OpHashToString(instructionData.OPType)][utils.OpHashToString(instructionData.OPCommand)])
 	for _, signature := range s.Signatures {
 		providerAddress, err := requests.CheckSignature(instructionData, signature, requestCounter.RequestPolicy)
 		if err != nil {

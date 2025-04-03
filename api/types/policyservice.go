@@ -1,9 +1,15 @@
 package types
 
 type InitializePolicyRequest struct {
-	InitialPolicyBytes []byte
-	NewPolicyRequests  []MultiSignedPolicy
-	Challenge          string
+	InitialPolicyBytes     []byte
+	NewPolicyRequests      []MultiSignedPolicy
+	LatestPolicyPublicKeys []ECDSAPublicKey
+	Challenge              string
+}
+
+type UpdatePolicyRequest struct {
+	NewPolicyRequest       MultiSignedPolicy
+	LatestPolicyPublicKeys []ECDSAPublicKey
 }
 
 type MultiSignedPolicy struct {
@@ -11,20 +17,8 @@ type MultiSignedPolicy struct {
 	Signatures  []*SignatureMessage
 }
 
-type SignNewPolicyRequest struct {
-	PolicyBytes []byte // The new policy bytes being proposed/signed
-	Signature   *SignatureMessage
-	Challenge   string
-}
-
 type InitializePolicyResponse struct {
 	Token string
-}
-
-type SignNewPolicyResponse struct {
-	ActivePolicy     string // Note: This doesn't really make sense, do we need it?
-	ThresholdReached bool
-	Token            string
 }
 
 type GetActivePolicyRequest struct {

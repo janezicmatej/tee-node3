@@ -60,8 +60,11 @@ func CheckRequest(instructionData *instruction.Data) (bool, error) {
 		return false, errors.New("invalid TEE id")
 	}
 
-	activePolicy := policy.ActiveSigningPolicy.RewardEpochId == uint32(instructionData.RewardEpochID.Uint64())
-	if !activePolicy && policy.ActiveSigningPolicy.RewardEpochId != uint32(instructionData.RewardEpochID.Uint64())-1 {
+	activeSigningPolicy := policy.GetActiveSigningPolicy()
+
+	isActivePolicy := activeSigningPolicy.RewardEpochId == uint32(instructionData.RewardEpochID.Uint64())
+	isPreviousPolicy := activeSigningPolicy.RewardEpochId == uint32(instructionData.RewardEpochID.Uint64())+1
+	if !isActivePolicy && !isPreviousPolicy {
 		return false, errors.New("reward epoch id too old")
 	}
 
@@ -70,7 +73,7 @@ func CheckRequest(instructionData *instruction.Data) (bool, error) {
 		return false, status.Error(codes.InvalidArgument, "invalid command for operation type")
 	}
 
-	return activePolicy, nil
+	return isActivePolicy, nil
 }
 
 // Check if the request is new
