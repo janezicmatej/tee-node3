@@ -85,4 +85,10 @@ type WalletBackupId struct {
 
 	OpType        [32]byte
 	RewardEpochID uint32
+	RandomNonce   [32]byte
+}
+
+type WalletSignedKeyExistenceProof struct {
+	KeyExistenceProof []byte
+	Signature         []byte
 }

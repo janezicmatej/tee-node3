@@ -1,11 +1,11 @@
 module tee-node
 
-go 1.23.8
+go 1.24.4
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/ethereum/go-ethereum v1.15.7
-	github.com/flare-foundation/go-flare-common v1.2.1-0.20250606133105-350fe13ad6e6
+	github.com/flare-foundation/go-flare-common v1.2.1-0.20250616123158-2ad8a76b5ab5
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/go-tpm-tools v0.4.4

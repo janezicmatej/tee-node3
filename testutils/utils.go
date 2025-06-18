@@ -3,7 +3,6 @@ package testutils
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -80,7 +79,8 @@ func BuildMultiSignedPolicy(policyBytes []byte, voterPrivKeys []*ecdsa.PrivateKe
 
 	for _, voterPrivKey := range voterPrivKeys {
 		// sig, err := policy.SignNewSigningPolicy(policy.SigningPolicyHash(policyBytes), voterPrivKeys[i])
-		sig, err := utils.Sign(policy.SigningPolicyBytesToHash(policyBytes), voterPrivKey)
+		hash := policy.SigningPolicyBytesToHash(policyBytes)
+		sig, err := utils.Sign(hash[:], voterPrivKey)
 		if err != nil {
 			panic(err)
 		}
@@ -211,7 +211,7 @@ func RandomNormalizedArray(n int, seed int64) []float64 {
 
 // Resets the state of the TEE between tests
 func ResetTEEState() {
-	policy.DestroyState()
+	policy.Storage.DestroyState()
 	wallets.Storage.DestroyState()
 
 	// TODO: Reset any other state that might interfere with the tests
@@ -221,7 +221,7 @@ func ResetTEEState() {
 // We need this to make the tests work for randomly generated policies
 func SetMockInitialPolicy(initialPolicyBytes []byte) {
 	// Set the initial policy hash in the config
-	settings.InitialPolicyHash = hex.EncodeToString(policy.SigningPolicyBytesToHash(initialPolicyBytes))
+	settings.InitialPolicyHash = policy.SigningPolicyBytesToHash(initialPolicyBytes)
 }
 
 // This will construct a Mock Signing Policy, set it on the Tee and return the policy
@@ -245,8 +245,8 @@ func SetInitialPolicy(initialPolicy *policy.SigningPolicy, addressesToPublicKeys
 	SetMockInitialPolicy(initialPolicyBytes)
 
 	// Set the Active Signing Policy
-	policy.SetActiveSigningPolicy(initialPolicy)
-	policy.SetActiveSigningPolicyPublicKeys(addressesToPublicKeys)
+	policy.Storage.SetActiveSigningPolicy(initialPolicy)
+	policy.Storage.SetActiveSigningPolicyPublicKeys(addressesToPublicKeys)
 }
 
 // Providers represents a group of voters with private keys.
@@ -315,7 +315,7 @@ func Post[R any](url string, req any) (R, error) {
 	if err != nil {
 		return *new(R), err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return *new(R), err

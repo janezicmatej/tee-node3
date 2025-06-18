@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/stretchr/testify/require"
 
 	commonpayment "github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
@@ -57,7 +58,8 @@ func BuildMockInstruction(OpType string, OpCommand string, OriginalMessage []byt
 
 }
 
-func CreateMockWallet(t *testing.T, nodeId common.Address, walletId common.Hash, keyId uint64, rewardEpochId uint32, privKey *ecdsa.PrivateKey, adminPrivKeys, cosignerPrivKeys []*ecdsa.PrivateKey) {
+func CreateMockWallet(t *testing.T, nodeId common.Address, walletId common.Hash, keyId uint64, rewardEpochId uint32,
+	privKey *ecdsa.PrivateKey, adminPrivKeys, cosignerPrivKeys []*ecdsa.PrivateKey) wallet.ITeeWalletKeyManagerKeyExistence {
 	instructionIdBytes, _ := GenerateRandomBytes(32)
 
 	adminPubKeys := make([]wallet.PublicKey, 0)
@@ -104,9 +106,13 @@ func CreateMockWallet(t *testing.T, nodeId common.Address, walletId common.Hash,
 	)
 	require.NoError(t, err)
 
-	_, err = walletsinstruction.NewWallet(&instruction.Data.DataFixed)
+	walletProofBytes, err := walletsinstruction.NewWallet(&instruction.Data.DataFixed)
+	require.NoError(t, err)
+	walletExistenceProof, err := structs.Decode[wallet.ITeeWalletKeyManagerKeyExistence](wallet.KeyExistenceStructArg, walletProofBytes)
 
 	require.NoError(t, err)
+
+	return walletExistenceProof
 }
 
 func BuildMockPaymentOriginalMessage(t *testing.T, mockWallet common.Hash) []byte {

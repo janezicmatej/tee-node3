@@ -19,7 +19,7 @@ func getActionInfo(url string) (*types.QueuedActionInfo, error) {
 		return nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func getAction(url string, actionInfo *types.QueuedActionInfo) (*types.QueuedAct
 		return nil, err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func postActionResponse(url string, actionResponse *types.QueueActionResponse) e
 		return err
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return err

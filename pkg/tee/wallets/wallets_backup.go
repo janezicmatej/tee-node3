@@ -41,6 +41,7 @@ type WalletBackupId struct {
 
 	OpType        [32]byte
 	RewardEpochID uint32
+	RandomNonce   [32]byte
 }
 
 type EncryptedShares struct {
@@ -187,6 +188,10 @@ func BackupWallet(wallet *Wallet, providersPubKeys []*ecdsa.PublicKey, signingPo
 		adminsPubKeys[i] = types.PubKeyToStruct(pubKey)
 	}
 	normalizedWeights := settings.WeightsNormalization(signingPolicyWeights)
+	randomNonce, err := utils.GenerateRandom()
+	if err != nil {
+		return nil, err
+	}
 
 	metaData := WalletBackupMetaData{
 		WalletBackupId: WalletBackupId{
@@ -196,6 +201,7 @@ func BackupWallet(wallet *Wallet, providersPubKeys []*ecdsa.PublicKey, signingPo
 			PublicKey:     types.PubKeyToStruct(&wallet.PrivateKey.PublicKey),
 			OpType:        wallet.OpType,
 			RewardEpochID: rewardEpochId,
+			RandomNonce:   randomNonce,
 		},
 		AdminsPublicKeys:   adminsPubKeys,
 		AdminsThreshold:    wallet.AdminsThreshold,
@@ -301,29 +307,6 @@ func SplitAndEncrypt(key *ecdsa.PrivateKey, encryptionPubKeys []*ecdsa.PublicKey
 	}
 
 	return &encryptedShares, nil
-}
-
-func GetPositionRole(walletBackup *WalletBackup, pubKeyECDSA types.ECDSAPublicKey) (int, int, error) {
-	adminPos := -1
-	for i, pubKey := range walletBackup.AdminEncryptedParts.OwnersPublicKeys {
-		if pubKeyECDSA == pubKey {
-			adminPos = i
-			break
-		}
-	}
-
-	provPos := -1
-	for i, pubKey := range walletBackup.ProvidersEncryptedParts.OwnersPublicKeys {
-		if pubKeyECDSA == pubKey {
-			provPos = i
-			break
-		}
-	}
-	if adminPos == -1 && provPos == -1 {
-		return adminPos, provPos, errors.New("no encrypted share for the given public key")
-	}
-
-	return adminPos, provPos, nil
 }
 
 func DecryptSplit(encryptedShare []byte, privKeyECDSA *ecdsa.PrivateKey) (*KeySplit, error) {

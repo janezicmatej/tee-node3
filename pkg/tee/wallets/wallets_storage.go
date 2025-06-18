@@ -57,6 +57,17 @@ func (walletsStorage *WalletsStorage) GetWallet(idPair WalletKeyIdPair) (*Wallet
 	return walletCopy, nil
 }
 
+func (walletsStorage *WalletsStorage) GetWallets() []*Wallet {
+	wallets := make([]*Wallet, len(walletsStorage.wallets))
+	i := 0
+	for _, wallet := range walletsStorage.wallets {
+		wallets[i] = CopyWallet(wallet)
+		i++
+	}
+
+	return wallets
+}
+
 func (walletsStorage *WalletsStorage) WalletExists(idPair WalletKeyIdPair) bool {
 	_, ok := walletsStorage.wallets[idPair]
 	return ok

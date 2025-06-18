@@ -159,7 +159,7 @@ func CheckInstructionData(instructionData *instruction.DataFixed) (*policy.Signi
 		return nil, errors.New("invalid TEE id")
 	}
 
-	activeSigningPolicy, err := policy.GetActiveSigningPolicy()
+	activeSigningPolicy, err := policy.Storage.GetActiveSigningPolicy()
 	if err != nil {
 		return nil, err
 	}

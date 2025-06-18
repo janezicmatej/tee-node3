@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/pkg/errors"
 
@@ -48,16 +49,13 @@ func NewWallet(instructionData *instruction.DataFixed) ([]byte, error) {
 		return nil, err
 	}
 
-	result := wallets.WalletToKeyExistenceProof(storedWallet, node.GetTeeId())
-
-	// abi.Arguments{wallet.MessageArguments[wallet.KeyGenerate]}.Pack(originalMessage)
-	// todo: change to abi encoded
-	resultEncoded, err := json.Marshal(result)
+	existenceProof := wallets.WalletToKeyExistenceProof(storedWallet, node.GetTeeId())
+	existenceProofEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, existenceProof)
 	if err != nil {
 		return nil, err
 	}
 
-	return resultEncoded, nil
+	return existenceProofEncoded, nil
 }
 
 func DeleteWallet(instructionData *instruction.DataFixed) error {
@@ -121,7 +119,7 @@ func KeyDataProviderRestore(instructionData *instruction.DataFixed,
 		return nil, err
 	}
 
-	policyAtBackup, err := policy.GetSigningPolicy(walletBackupId.RewardEpochID)
+	policyAtBackup, err := policy.Storage.GetSigningPolicy(walletBackupId.RewardEpochID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,14 +154,13 @@ func KeyDataProviderRestore(instructionData *instruction.DataFixed,
 	if err != nil {
 		return nil, err
 	}
-	result := wallets.WalletToKeyExistenceProof(storedWallet, node.GetTeeId())
-	// todo: change to abi encoded
-	resultEncoded, err := json.Marshal(result)
+	existenceProof := wallets.WalletToKeyExistenceProof(storedWallet, node.GetTeeId())
+	existenceProofEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, existenceProof)
 	if err != nil {
 		return nil, err
 	}
 
-	return resultEncoded, nil
+	return existenceProofEncoded, nil
 }
 
 func processKeySplitMessages(variableMessages, adminVariableMessages [][]byte, walletBackupId wallets.WalletBackupId) ([]*wallets.KeySplit, error) {
@@ -258,12 +255,20 @@ func backupRequestToBackupId(req *wallet.ITeeWalletBackupManagerKeyDataProviderR
 		KeyId:         req.BackupId.KeyId,
 		OpType:        req.BackupId.OpType,
 		RewardEpochID: uint32(req.BackupId.RewardEpochId.Uint64()),
+		RandomNonce:   [32]byte{},
 	}
 	if len(req.BackupId.PublicKey) != 64 {
 		return wallets.WalletBackupId{}, errors.New("unsupported public key format")
 	}
 	copy(walletBackupId.PublicKey.X[:], req.BackupId.PublicKey[:32])
 	copy(walletBackupId.PublicKey.Y[:], req.BackupId.PublicKey[32:])
+
+	randomNonce := req.BackupId.RandomNonce.Bytes()
+	if len(randomNonce) > 32 {
+		return wallets.WalletBackupId{}, errors.New("random nonce too big")
+	}
+	randomNonce = append(make([]byte, 32-len(randomNonce)), randomNonce...)
+	copy(walletBackupId.RandomNonce[:], randomNonce)
 
 	return walletBackupId, nil
 }
