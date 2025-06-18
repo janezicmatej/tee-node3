@@ -9,48 +9,63 @@ import (
 	"github.com/pkg/errors"
 )
 
-var signingPoliciesStorage *SigningPoliciesStorage
+var Storage *SigningPoliciesStorage
 
 func init() {
-	signingPoliciesStorage = InitSigningPoliciesStorage()
+	Storage = InitSigningPoliciesStorage()
 }
 
 // SigningPoliciesStorage holds policies. Since policies are being added and the active policy is being modified,
 // we need mutex. Note that when a policy is added in a the SigningPolicies map, it is never modified.
 type SigningPoliciesStorage struct {
-	ActiveSigningPolicy           *SigningPolicy // Current policy that is being used for signing
-	ActiveSigningPolicyPublicKeys map[common.Address]*ecdsa.PublicKey
-	SigningPolicies               map[uint32]*SigningPolicy // map of rewardEpochId to policy
+	activeSigningPolicy           *SigningPolicy // Current policy that is being used for signing
+	activeSigningPolicyPublicKeys map[common.Address]*ecdsa.PublicKey
+	signingPolicies               map[uint32]*SigningPolicy // map of rewardEpochId to policy
 
 	sync.RWMutex
 }
 
 func InitSigningPoliciesStorage() *SigningPoliciesStorage {
-	return &SigningPoliciesStorage{SigningPolicies: make(map[uint32]*SigningPolicy)}
+	return &SigningPoliciesStorage{signingPolicies: make(map[uint32]*SigningPolicy)}
 }
 
-func GetActiveSigningPolicy() (*SigningPolicy, error) {
-	signingPoliciesStorage.RLock()
-	defer signingPoliciesStorage.RUnlock()
-
-	if signingPoliciesStorage.ActiveSigningPolicy == nil {
+func (signingPoliciesStorage *SigningPoliciesStorage) GetActiveSigningPolicy() (*SigningPolicy, error) {
+	if signingPoliciesStorage.activeSigningPolicy == nil {
 		return nil, errors.New("signing policy not initialized")
 	}
 
 	// make a copy
-	activeSigningPolicy := *signingPoliciesStorage.ActiveSigningPolicy
+	activeSigningPolicy := *signingPoliciesStorage.activeSigningPolicy
 
 	return &activeSigningPolicy, nil
 }
 
-func GetActiveSigningPolicyPublicKeysMap() map[common.Address]*ecdsa.PublicKey {
-	signingPoliciesStorage.RLock()
-	defer signingPoliciesStorage.RUnlock()
+func (signingPoliciesStorage *SigningPoliciesStorage) GetSigningPolicy(epochId uint32) (*SigningPolicy, error) {
+	policy, ok := signingPoliciesStorage.signingPolicies[epochId]
+	if !ok {
+		return nil, errors.New("policy of the given reward epoch not in the storage")
+	}
 
-	return signingPoliciesStorage.ActiveSigningPolicyPublicKeys
+	// make a copy
+	returnPolicy := *policy
+
+	return &returnPolicy, nil
 }
 
-func ToSigningPolicyPublicKeysSlice(policy *SigningPolicy, pubKeysMap map[common.Address]*ecdsa.PublicKey) ([]*ecdsa.PublicKey, error) {
+func (signingPoliciesStorage *SigningPoliciesStorage) SetActiveSigningPolicy(policy *SigningPolicy) {
+	signingPoliciesStorage.activeSigningPolicy = policy
+	signingPoliciesStorage.signingPolicies[policy.RewardEpochId] = policy
+}
+
+func (signingPoliciesStorage *SigningPoliciesStorage) SetActiveSigningPolicyPublicKeys(addressesToPublicKeys map[common.Address]*ecdsa.PublicKey) {
+	signingPoliciesStorage.activeSigningPolicyPublicKeys = addressesToPublicKeys
+}
+
+func (signingPoliciesStorage *SigningPoliciesStorage) GetActiveSigningPolicyPublicKeysSlice() ([]*ecdsa.PublicKey, error) {
+	return toSigningPolicyPublicKeysSlice(signingPoliciesStorage.activeSigningPolicy, signingPoliciesStorage.activeSigningPolicyPublicKeys)
+}
+
+func toSigningPolicyPublicKeysSlice(policy *SigningPolicy, pubKeysMap map[common.Address]*ecdsa.PublicKey) ([]*ecdsa.PublicKey, error) {
 	pubKeys := make([]*ecdsa.PublicKey, len(policy.Voters))
 	var ok bool
 	for i, address := range policy.Voters {
@@ -64,7 +79,7 @@ func ToSigningPolicyPublicKeysSlice(policy *SigningPolicy, pubKeysMap map[common
 	return pubKeys, nil
 }
 
-func SigningPolicyBytesToHash(signingPolicy []byte) []byte {
+func SigningPolicyBytesToHash(signingPolicy []byte) common.Hash {
 	if len(signingPolicy)%32 != 0 {
 		signingPolicy = append(signingPolicy, make([]byte, 32-len(signingPolicy)%32)...)
 	}
@@ -72,13 +87,17 @@ func SigningPolicyBytesToHash(signingPolicy []byte) []byte {
 	for i := 2; i < len(signingPolicy)/32; i++ {
 		hash = crypto.Keccak256(hash, signingPolicy[i*32:(i+1)*32])
 	}
-	return hash
+
+	var res common.Hash
+	copy(res[:], hash)
+
+	return res
 }
 
-func SigningPolicyToHash(signingPolicy *SigningPolicy) ([]byte, error) {
+func (signingPolicy *SigningPolicy) Hash() (common.Hash, error) {
 	signingPolicyBytes, err := EncodeSigningPolicy(signingPolicy)
 	if err != nil {
-		return nil, err
+		return common.Hash{}, err
 	}
 
 	return SigningPolicyBytesToHash(signingPolicyBytes), nil
@@ -95,38 +114,8 @@ func WeightOfSigners(signers map[common.Address][]byte, signingPolicy *SigningPo
 	return currentWeight
 }
 
-func SetActiveSigningPolicyAndPubKeys(policy *SigningPolicy, addressesToPublicKeys map[common.Address]*ecdsa.PublicKey) {
-	signingPoliciesStorage.ActiveSigningPolicy = policy
-	signingPoliciesStorage.SigningPolicies[policy.RewardEpochId] = policy
-	signingPoliciesStorage.ActiveSigningPolicyPublicKeys = addressesToPublicKeys
-}
-
-// SetActiveSigningPolicy happens only at initialize policy stage, hence does not need locking.
-func SetActiveSigningPolicy(policy *SigningPolicy) {
-	signingPoliciesStorage.ActiveSigningPolicy = policy
-	signingPoliciesStorage.SigningPolicies[policy.RewardEpochId] = policy
-}
-
-// SetActiveSigningPolicyPublicKeys happens only at initialize policy stage, hence does not need locking.
-func SetActiveSigningPolicyPublicKeys(addressesToPublicKeys map[common.Address]*ecdsa.PublicKey) {
-	signingPoliciesStorage.ActiveSigningPolicyPublicKeys = addressesToPublicKeys
-}
-
-func GetSigningPolicy(epochId uint32) (*SigningPolicy, error) {
-	signingPoliciesStorage.RLock()
-	defer signingPoliciesStorage.RUnlock()
-	policy, ok := signingPoliciesStorage.SigningPolicies[epochId]
-	if !ok {
-		return nil, errors.New("policy of the given reward epoch not in the storage")
-	}
-
-	returnPolicy := *policy
-
-	return &returnPolicy, nil
-}
-
-func DestroyState() {
-	signingPoliciesStorage.ActiveSigningPolicy = nil
-	signingPoliciesStorage.SigningPolicies = make(map[uint32]*SigningPolicy)
-	signingPoliciesStorage.ActiveSigningPolicyPublicKeys = nil
+func (signingPoliciesStorage *SigningPoliciesStorage) DestroyState() {
+	signingPoliciesStorage.activeSigningPolicy = nil
+	signingPoliciesStorage.signingPolicies = make(map[uint32]*SigningPolicy)
+	signingPoliciesStorage.activeSigningPolicyPublicKeys = nil
 }

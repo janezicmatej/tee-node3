@@ -2,7 +2,9 @@ package utils
 
 import (
 	"crypto/ecdsa"
+	"crypto/rand"
 	"fmt"
+	"io"
 	"slices"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -13,6 +15,22 @@ import (
 
 	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
+
+func GenerateRandom() ([32]byte, error) {
+	b := make([]byte, 32)
+	n, err := io.ReadFull(rand.Reader, b)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	if n != 32 {
+		return [32]byte{}, errors.New("failed to read random 32 bytes")
+	}
+
+	var r [32]byte
+	copy(r[:], b)
+
+	return r, nil
+}
 
 // GenerateEthereumPrivateKey generates a new Ethereum private key
 func GenerateEthereumPrivateKey() (*ecdsa.PrivateKey, error) {

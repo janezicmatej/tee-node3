@@ -2,7 +2,6 @@ package policy
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -106,7 +105,7 @@ func TestPolicyReplayingWithIndexerData(t *testing.T) {
 	err = json.Unmarshal(req.Data.Message, &decoded)
 	require.NoError(t, err)
 
-	settings.InitialPolicyHash = hex.EncodeToString(pd.SigningPolicyBytesToHash(decoded.InitialPolicyBytes))
+	settings.InitialPolicyHash = pd.SigningPolicyBytesToHash(decoded.InitialPolicyBytes)
 
 	err = policyactions.InitializePolicy(req.Data.Message)
 	require.NoError(t, err)

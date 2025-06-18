@@ -1,7 +1,6 @@
 package signinginstruction_test
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"tee-node/api/types"
@@ -36,9 +35,10 @@ func TestSignPaymentTransaction(t *testing.T) {
 	additionalFixedMessage, err := json.Marshal(types.SignPaymentAdditionalFixedMessage{PaymentHash: paymentHash, KeyId: mockKeyId})
 	require.NoError(t, err)
 
-	instructionId, _ := testutils.GenerateRandomBytes(32)
+	instructionId, err := utils.GenerateRandom()
+	require.NoError(t, err)
 	instructionDataFixed := instruction.DataFixed{
-		InstructionID:          common.HexToHash(hex.EncodeToString(instructionId)),
+		InstructionID:          instructionId,
 		TeeID:                  myNodeId,
 		RewardEpochID:          big.NewInt(int64(epochId)),
 		OPType:                 utils.StringToOpHash("XRP"),

@@ -2,8 +2,6 @@ package walletsinstruction_test
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
-	"encoding/json"
 	"math/big"
 	"tee-node/api/types"
 	"tee-node/pkg/tee/node"
@@ -16,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -60,10 +59,10 @@ func TestKeyGenerate(t *testing.T) {
 	originalMessageEncoded, err := abi.Arguments{wallet.MessageArguments[wallet.KeyGenerate]}.Pack(originalMessage)
 	require.NoError(t, err)
 
-	instructionId, _ := testutils.GenerateRandomBytes(32)
-
+	instructionId, err := utils.GenerateRandom()
+	require.NoError(t, err)
 	instructionDataFixed := instruction.DataFixed{
-		InstructionID:          common.HexToHash(hex.EncodeToString(instructionId)),
+		InstructionID:          instructionId,
 		TeeID:                  teeId,
 		RewardEpochID:          big.NewInt(int64(epochId)),
 		OPType:                 utils.StringToOpHash("WALLET"),
@@ -77,8 +76,7 @@ func TestKeyGenerate(t *testing.T) {
 		t.Fatalf("Failed to sign the payment transaction: %v", err)
 	}
 
-	var walletExistenceProof wallet.ITeeWalletKeyManagerKeyExistence
-	err = json.Unmarshal(response, &walletExistenceProof)
+	walletExistenceProof, err := structs.Decode[wallet.ITeeWalletKeyManagerKeyExistence](wallet.KeyExistenceStructArg, response)
 	require.NoError(t, err)
 
 	require.Equal(t, teeId, walletExistenceProof.TeeId)

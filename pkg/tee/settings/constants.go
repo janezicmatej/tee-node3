@@ -2,6 +2,8 @@ package settings
 
 import (
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // Modes:
@@ -11,7 +13,10 @@ var Mode = 1
 
 const ProxyUrl = "http://localhost:8545"
 
-var InitialPolicyHash = "6c5d823aa3ecf8e2a00f7bad8b03d6e4557de9ac7be7c5d8408047f5a31f4fd1"
+// for testing during development
+var InitialPolicyCheck = false
+var InitialPolicyHash = common.HexToHash("6c5d823aa3ecf8e2a00f7bad8b03d6e4557de9ac7be7c5d8408047f5a31f4fd1")
+var InitialPolicyId = uint32(1)
 
 const ProxyTimeout = time.Second
 

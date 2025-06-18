@@ -81,7 +81,7 @@ func init() {
 }
 
 // FetchPolicyHistory extracts all the data involving policies from the database
-func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB) ([]*relay.RelaySigningPolicyInitialized, map[string][]*PolicySignature, error) {
+func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *gorm.DB) ([]*relay.RelaySigningPolicyInitialized, map[common.Hash][]*PolicySignature, error) {
 	logsParams := database.LogsParams{
 		Address: params.RelayContractAddress,
 		Topic0:  signingPolicyInitializedEventSel,
@@ -109,7 +109,7 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 		return nil, nil, err
 	}
 
-	hashToSignatures := make(map[string][]*PolicySignature)
+	hashToSignatures := make(map[common.Hash][]*PolicySignature)
 	for _, tx := range txs {
 		inputBytes, err := hex.DecodeString(tx.Input)
 		if err != nil {
@@ -123,7 +123,7 @@ func FetchPolicyHistory(ctx context.Context, params *PolicyHistoryParams, db *go
 		}
 		// rewardEpochId := *abi.ConvertType(signNewSigningPolicyInputBytesArray[0], new(*big.Int)).(**big.Int)
 		newSigningPolicyHashBytes := *abi.ConvertType(signNewSigningPolicyInputBytesArray[1], new([32]byte)).(*[32]byte)
-		newSigningPolicyHash := hex.EncodeToString(newSigningPolicyHashBytes[:])
+		newSigningPolicyHash := common.BytesToHash(newSigningPolicyHashBytes[:])
 		systemManageSignature := *abi.ConvertType(signNewSigningPolicyInputBytesArray[2], new(system.IFlareSystemsManagerSignature)).(*system.IFlareSystemsManagerSignature)
 
 		sigBytes := make([]byte, 65)
@@ -158,12 +158,12 @@ type PolicySignature struct {
 	PubKey []byte
 }
 
-func CreateInitializePolicyAction(policies []*relay.RelaySigningPolicyInitialized, signatures map[string][]*PolicySignature, pubKeysMap map[common.Address]*ecdsa.PublicKey) (*api.QueuedAction, error) {
+func CreateInitializePolicyAction(policies []*relay.RelaySigningPolicyInitialized, signatures map[common.Hash][]*PolicySignature, pubKeysMap map[common.Address]*ecdsa.PublicKey) (*api.QueuedAction, error) {
 	policyRequests := []api.MultiSignedPolicy{}
 
 	// Replay policy signing from the second policy onwards
 	for _, policy := range policies[1:] {
-		policyHash := hex.EncodeToString(pd.SigningPolicyBytesToHash(policy.SigningPolicyBytes))
+		policyHash := pd.SigningPolicyBytesToHash(policy.SigningPolicyBytes)
 		policySignatures := signatures[policyHash]
 		policyDecoded, err := pd.DecodeSigningPolicy(policy.SigningPolicyBytes)
 		if err != nil {

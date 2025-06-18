@@ -18,15 +18,19 @@ const (
 )
 
 type Node struct {
-	TeeId      common.Address // The ethereum address of the node, derived from the PrivateKey
-	Status     string
-	PrivateKey *ecdsa.PrivateKey
+	TeeId        common.Address // The ethereum address of the node, derived from the PrivateKey
+	Status       string
+	PrivateKey   *ecdsa.PrivateKey
+	Nonce        uint64 // currently not in use
+	PausingNonce uint64 // currently not in use
 }
 
 type NodeInfo struct {
-	TeeId     common.Address // The ethereum address of the node, derived from the PrivateKey
-	Status    string
-	PublicKey types.ECDSAPublicKey
+	TeeId        common.Address // The ethereum address of the node, derived from the PrivateKey
+	Status       string
+	PublicKey    types.ECDSAPublicKey
+	Nonce        uint64
+	PausingNonce uint64
 }
 
 func InitNode() error {
@@ -45,7 +49,13 @@ func InitNode() error {
 }
 
 func GetNodeInfo() NodeInfo {
-	return NodeInfo{TeeId: node.TeeId, Status: node.Status, PublicKey: types.PubKeyToStruct(&node.PrivateKey.PublicKey)}
+	return NodeInfo{
+		TeeId:        node.TeeId,
+		Status:       node.Status,
+		PublicKey:    types.PubKeyToStruct(&node.PrivateKey.PublicKey),
+		Nonce:        node.Nonce,
+		PausingNonce: node.PausingNonce,
+	}
 }
 
 func GetTeeId() common.Address {

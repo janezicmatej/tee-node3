@@ -15,6 +15,7 @@ func GetBackupPackage(getAction *types.ActionData) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	myTeeId := node.GetTeeId()
 
 	wallets.Storage.RLock()
 	wallet, err := wallets.Storage.GetWallet(walletKeyId)
@@ -23,20 +24,21 @@ func GetBackupPackage(getAction *types.ActionData) ([]byte, error) {
 		return nil, err
 	}
 
-	myTeeId := node.GetTeeId()
-
-	activePolicy, err := policy.GetActiveSigningPolicy()
+	policy.Storage.RLock()
+	activePolicy, err := policy.Storage.GetActiveSigningPolicy()
 	if err != nil {
+		policy.Storage.RUnlock()
 		return nil, err
 	}
-	pubKeysMap := policy.GetActiveSigningPolicyPublicKeysMap()
-	activePolicyPublicKeys, err := policy.ToSigningPolicyPublicKeysSlice(activePolicy, pubKeysMap)
+	activePolicyPublicKeys, err := policy.Storage.GetActiveSigningPolicyPublicKeysSlice()
+	policy.Storage.RUnlock()
 	if err != nil {
 		return nil, err
 	}
 
 	walletBackup, err := wallets.BackupWallet(
-		wallet, activePolicyPublicKeys,
+		wallet,
+		activePolicyPublicKeys,
 		activePolicy.Weights,
 		activePolicy.RewardEpochId,
 		myTeeId,

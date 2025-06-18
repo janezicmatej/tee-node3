@@ -19,9 +19,9 @@ func ProcessAction(actionData *types.ActionData) ([]byte, error) {
 	// case "WALLET":
 	// 	result, err = handleWalletAction(actionData)
 	case "POLICY":
-		result, err = handlePolicyAction(actionData)
+		result, err = executePolicyAction(actionData)
 	case "GET":
-		result, err = handleGetInstruction(actionData)
+		result, err = getData(actionData)
 	default:
 		return nil, errors.New("invalid action type")
 	}
@@ -32,7 +32,7 @@ func ProcessAction(actionData *types.ActionData) ([]byte, error) {
 	return result, nil
 }
 
-func handlePolicyAction(actionData *types.ActionData) ([]byte, error) {
+func executePolicyAction(actionData *types.ActionData) ([]byte, error) {
 	var err error
 	response := []byte{}
 	switch utils.OpHashToString(actionData.OPCommand) {
@@ -50,14 +50,13 @@ func handlePolicyAction(actionData *types.ActionData) ([]byte, error) {
 	return response, nil
 }
 
-// TODO: Implement TEE_INFO and KEY_INFO
-func handleGetInstruction(getAction *types.ActionData) ([]byte, error) {
+func getData(getAction *types.ActionData) ([]byte, error) {
 	switch utils.OpHashToString(getAction.OPCommand) {
 	case "TEE_INFO":
-		return nil, errors.New("TEE_INFO command not implemented yet")
+		return getactions.GetTeeInfo(getAction)
 
 	case "KEY_INFO":
-		return nil, errors.New("KEY_INFO command not implemented yet")
+		return getactions.GetKeyInfoPackage()
 
 	case "TEE_BACKUP":
 		return getactions.GetBackupPackage(getAction)
