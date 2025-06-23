@@ -20,8 +20,6 @@ import (
 
 	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const PKITokenType = "PKI"
@@ -83,7 +81,7 @@ func GetGoogleAttestationToken(nonces []string, tokenType string) ([]byte, error
 	requestBody, err := json.Marshal(data)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, err
 	}
 
 	resp, err := httpClient.Post(url, "application/json", strings.NewReader(string(requestBody)))

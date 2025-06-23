@@ -92,3 +92,8 @@ type WalletSignedKeyExistenceProof struct {
 	KeyExistenceProof []byte
 	Signature         []byte
 }
+
+type KeyDataProviderRestoreResultStatus struct {
+	ErrorPositions []int
+	ErrorLogs      []string
+}

@@ -26,12 +26,19 @@ func SignXrpPayment(paymentHash string, privateKey *ecdsa.PrivateKey) ([]byte, e
 	return txnSignature, nil
 }
 
-func CheckCosigners(cosignersSignatures map[common.Address][]byte, walletCosigners []common.Address, threshold uint64) (bool, error) {
-	for cosigner := range cosignersSignatures {
-		if ok := slices.Contains(walletCosigners, cosigner); !ok {
-			return false, errors.New("signed by a non-cosigner")
+func CheckCosigners(signers []common.Address, isSignerDataProvider []bool, walletCosigners []common.Address, threshold uint64) (bool, error) {
+	countCosigners := uint64(0)
+	for _, cosigner := range walletCosigners {
+		if ok := slices.Contains(signers, cosigner); ok {
+			countCosigners++
 		}
 	}
 
-	return uint64(len(cosignersSignatures)) >= threshold, nil
+	for i, signer := range signers {
+		if isCosigner := slices.Contains(walletCosigners, signer); !isCosigner && !isSignerDataProvider[i] {
+			return false, errors.New("signed by an entity that is nether data provider or cosigner")
+		}
+	}
+
+	return countCosigners >= threshold, nil
 }

@@ -88,7 +88,7 @@ func TestBackupAndRecover(t *testing.T) {
 	// Recover the wallet
 	recoveredWallet, err := RecoverWallet(
 		append(adminsKeyShares, providersKeyShares...),
-		walletBackup.WalletBackupMetaData,
+		&walletBackup.WalletBackupMetaData,
 	)
 	assert.NoError(t, err)
 	wallet.Restored = true

@@ -85,6 +85,15 @@ func (walletsStorage *WalletsStorage) CheckNonce(idPair WalletKeyIdPair, nonce u
 	return nil
 }
 
+func (walletsStorage *WalletsStorage) GetNonce(idPair WalletKeyIdPair) (uint64, error) {
+	walletStatus, ok := walletsStorage.permanent[idPair]
+	if !ok {
+		return 0, errors.New("no wallet nonce")
+	}
+
+	return walletStatus.Nonce, nil
+}
+
 func (walletsStorage *WalletsStorage) UpdateNonce(idPair WalletKeyIdPair, nonce uint64) {
 	if walletStatus, ok := walletsStorage.permanent[idPair]; ok {
 		walletStatus.Nonce = nonce

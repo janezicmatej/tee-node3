@@ -43,8 +43,12 @@ func runQueueProcessing(proxyUrl string, queueId string) {
 			goto sleep
 		}
 
+		checkAndAdapt(action)
+
 		result, err = processQueuedAction(action)
 		if err != nil {
+			result.Log = err.Error()
+			result.Status = false
 			logger.Errorf("error processing action: %v", err)
 		}
 
@@ -63,10 +67,17 @@ func runQueueProcessing(proxyUrl string, queueId string) {
 	}
 }
 
+func checkAndAdapt(action *types.QueuedAction) {
+	if len(action.AdditionalVariableMessages) == 0 {
+		action.AdditionalVariableMessages = make([][]byte, len(action.Signatures))
+	}
+	// todo: additional checks?
+}
+
 func processQueuedAction(action *types.QueuedAction) (*types.QueueActionResult, error) {
 	var err error
 	response := &types.QueueActionResult{}
-
+		
 	switch action.Data.Type {
 	case types.InstructionType:
 		instructionData, err := parse[instruction.DataFixed](action.Data.Message)
@@ -75,19 +86,19 @@ func processQueuedAction(action *types.QueuedAction) (*types.QueueActionResult, 
 			return response, err
 		}
 
-		message, err := instructions.ProcessInstruction(
+		message, resultStatus, err := instructions.ProcessInstruction(
 			instructionData,
 			action.AdditionalVariableMessages,
 			action.Signatures,
-			action.CosignerAdditionalVariableMessages,
-			action.CosignerSignatures,
+			action.Data.SubmissionTag,
+			action.Timestamps,
 		)
+		response.AdditionalResultStatus = resultStatus
 		if err != nil {
 			response.Log = err.Error()
 			return response, err
 		}
 
-		response.Status = true
 		response.OPCommand = instructionData.OPCommand
 		response.OPType = instructionData.OPType
 		response.ResultData = types.QueueActionResultData{Message: message}
@@ -105,7 +116,6 @@ func processQueuedAction(action *types.QueuedAction) (*types.QueueActionResult, 
 			return response, err
 		}
 
-		response.Status = true
 		response.OPCommand = getData.OPCommand
 		response.OPType = getData.OPType
 		response.ResultData = types.QueueActionResultData{Message: message}
@@ -125,6 +135,8 @@ func processQueuedAction(action *types.QueuedAction) (*types.QueueActionResult, 
 			return response, err
 		}
 	}
+
+	response.Status = true
 
 	return response, nil
 }

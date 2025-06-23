@@ -2,6 +2,7 @@ package policy
 
 import (
 	"crypto/ecdsa"
+	"slices"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -103,10 +104,10 @@ func (signingPolicy *SigningPolicy) Hash() (common.Hash, error) {
 	return SigningPolicyBytesToHash(signingPolicyBytes), nil
 }
 
-func WeightOfSigners(signers map[common.Address][]byte, signingPolicy *SigningPolicy) uint16 {
+func WeightOfSigners(signers []common.Address, signingPolicy *SigningPolicy) uint16 {
 	currentWeight := uint16(0)
 	for i, voter := range signingPolicy.Voters {
-		if _, ok := signers[voter]; ok {
+		if ok := slices.Contains(signers, voter); ok {
 			currentWeight += signingPolicy.Weights[i]
 		}
 	}
