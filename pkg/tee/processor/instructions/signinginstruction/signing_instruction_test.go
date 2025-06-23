@@ -1,6 +1,7 @@
 package signinginstruction_test
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
 	"tee-node/api/types"
@@ -28,7 +29,7 @@ func TestSignPaymentTransaction(t *testing.T) {
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
 	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(numVoters, randSeed, epochId)
 
-	testutils.CreateMockWallet(t, myNodeId, mockWalletId, mockKeyId, epochId, privKeys[0], nil, nil)
+	testutils.CreateMockWallet(t, myNodeId, mockWalletId, mockKeyId, epochId, []*ecdsa.PrivateKey{privKeys[0]}, nil)
 
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
 
@@ -47,7 +48,7 @@ func TestSignPaymentTransaction(t *testing.T) {
 		AdditionalFixedMessage: additionalFixedMessage,
 	}
 
-	response, err := signinginstruction.SignPaymentTransaction(&instructionDataFixed, nil)
+	response, err := signinginstruction.SignPaymentTransaction(&instructionDataFixed, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to sign the payment transaction: %v", err)
 	}

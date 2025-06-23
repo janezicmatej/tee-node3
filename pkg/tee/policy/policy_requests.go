@@ -104,14 +104,14 @@ func processUpdatePolicyRequest(policyRequest types.MultiSignedPolicy) (*Signing
 		return nil, errors.New("policy is not active")
 	}
 
-	signers := make(map[common.Address][]byte)
-	for _, sig := range policyRequest.Signatures {
+	signers := make([]common.Address, len(policyRequest.Signatures))
+	for i, sig := range policyRequest.Signatures {
 		hash := SigningPolicyBytesToHash(policyRequest.PolicyBytes)
 		providerAddress, err := utils.CheckSignature(hash[:], sig.Signature, activeSigningPolicy.Voters)
 		if err != nil {
 			return nil, err
 		}
-		signers[providerAddress] = sig.Signature
+		signers[i] = providerAddress
 	}
 
 	if WeightOfSigners(signers, activeSigningPolicy) < activeSigningPolicy.Threshold {

@@ -1,156 +1,266 @@
 package instructions
 
 import (
-	"slices"
+	"encoding/json"
+	"tee-node/api/types"
 	"tee-node/pkg/tee/node"
 	"tee-node/pkg/tee/policy"
 	"tee-node/pkg/tee/processor/instructions/signinginstruction"
 	"tee-node/pkg/tee/processor/instructions/walletsinstruction"
-	"tee-node/pkg/tee/settings"
 	"tee-node/pkg/tee/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
-func ProcessInstruction(instructionData *instruction.DataFixed, variableMessages, signatures, cosignerVariableMessages, cosignerSignatures [][]byte) ([]byte, error) {
-	var result []byte
-
-	signingPolicy, err := CheckInstructionData(instructionData)
+func ProcessInstruction(
+	instructionData *instruction.DataFixed,
+	variableMessages, signatures [][]byte,
+	submissionTag types.SubmissionTag,
+	timestamps []uint64,
+) ([]byte, []byte, error) {
+	signingPolicy, err := checkInstructionData(instructionData)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	err = ValidateInstructionDataSize(instructionData)
+	err = validateInstructionDataSize(instructionData)
 	if err != nil {
-		return nil, err
-	}
-
-	signersDataProviders, err := SignaturesToSigners(instructionData, variableMessages, signatures)
-	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	thresholdReached, err := CheckDataProvidersThreshold(instructionData, signersDataProviders, signingPolicy)
+	signers, err := signaturesToSigners(instructionData, variableMessages, signatures)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	thresholdReached, isSignerDataProvider, err := checkDataProvidersThreshold(instructionData, signers, signingPolicy)
+	if err != nil {
+		return nil, nil, err
 	}
 	if !thresholdReached {
-		return nil, errors.New("threshold not reached")
+		return nil, nil, errors.New("threshold not reached")
 	}
 
-	cosigners, err := SignaturesToSigners(instructionData, cosignerVariableMessages, cosignerSignatures)
+	executionResult, resultStatus, err := validateExecuteInstruction(instructionData, variableMessages, signers, isSignerDataProvider, submissionTag)
 	if err != nil {
-		return nil, err
+		return nil, resultStatus, err
 	}
 
-	result, err = ExecuteInstruction(instructionData, variableMessages, cosignerVariableMessages, signersDataProviders, cosigners)
-	if err != nil {
-		return nil, err
+	var result []byte
+	switch submissionTag {
+	case types.ThresholdReachedSubmissionTag:
+		result = executionResult
+
+	case types.VotingClosedSubmissionTag:
+		instructionHash, err := instructionData.HashFixed()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		voteHash, err := voteHash(instructionData, signatures, variableMessages, signers, timestamps)
+		if err != nil {
+			return nil, nil, err
+		}
+		signature, err := node.Sign(voteHash[:])
+		if err != nil {
+			return nil, nil, err
+		}
+
+		signerSequence := types.SignerSequence{
+			Data: types.SignerSequenceData{
+				VoteHash:                   voteHash,
+				InstructionId:              instructionData.InstructionID,
+				InstructionHash:            instructionHash,
+				RewardEpochId:              uint32(instructionData.RewardEpochID.Uint64()),
+				TeeId:                      instructionData.TeeID,
+				Signatures:                 signatures,
+				AdditionalVariableMessages: variableMessages,
+				Timestamps:                 timestamps,
+			},
+			Signature: signature,
+		}
+
+		result, err = json.Marshal(signerSequence)
+		if err != nil {
+			return nil, nil, err
+		}
+
+	default:
+		return nil, nil, errors.New("unexpected submission tag")
 	}
 
-	return result, nil
+	return result, resultStatus, nil
 }
 
 // Call forwards the call to the appropriate service and method
-func ExecuteInstruction(instructionMessage *instruction.DataFixed, variableMessages [][]byte, cosignersVariableMessages [][]byte, signers, cosigners map[common.Address][]byte) ([]byte, error) {
+func validateExecuteInstruction(
+	instructionMessage *instruction.DataFixed,
+	variableMessages [][]byte,
+	signers []common.Address,
+	isSignerDataProvider []bool,
+	submissionTag types.SubmissionTag,
+) ([]byte, []byte, error) {
 	var err error
 	var result []byte
+	var resultStatus []byte
+
 	switch utils.OpHashToString(instructionMessage.OPType) {
 	case "REG":
-		result, err = executeRegInstruction(instructionMessage)
+		result, err = regInstruction(instructionMessage, submissionTag)
 
 	case "WALLET":
-		result, err = executeWalletInstruction(instructionMessage, variableMessages, cosignersVariableMessages, signers, cosigners)
+		result, resultStatus, err = walletInstruction(instructionMessage, variableMessages, signers, isSignerDataProvider, submissionTag)
 
 	case "XRP":
-		result, err = executeXrpInstruction(instructionMessage, cosigners)
-
-	// case "BTC":
-	// 	result, err = executeBtcInstruction(instructionMessage)
+		result, err = xrpInstruction(instructionMessage, signers, isSignerDataProvider, submissionTag)
 
 	case "FDC":
-		result, err = executeFdcInstruction(instructionMessage)
+		result, err = fdcInstruction(instructionMessage, submissionTag)
 
 	default:
-		return nil, status.Error(codes.InvalidArgument, "invalid operation type")
-	}
-	if err != nil {
-		return nil, err
+		err = errors.New("invalid operation type")
 	}
 
-	return result, nil
+	return result, resultStatus, err
 }
 
-func executeRegInstruction(instructionData *instruction.DataFixed) ([]byte, error) {
-	switch utils.OpHashToString(instructionData.OPCommand) {
-	case "AVAILABILITY_CHECK":
-		return nil, errors.New("REG AVAILABILITY_CHECK command not implemented yet")
+func regInstruction(instructionData *instruction.DataFixed, submissionTag types.SubmissionTag) ([]byte, error) {
+	switch submissionTag {
+	case types.ThresholdReachedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "AVAILABILITY_CHECK":
+			return nil, errors.New("REG AVAILABILITY_CHECK command not implemented yet")
 
-	// case "TO_PAUSE_FOR_UPGRADE":
-	// 	return nil, errors.New("REG TO_PAUSE_FOR_UPGRADE command not implemented yet")
+		// case "TO_PAUSE_FOR_UPGRADE":
+		// 	return nil, errors.New("REG TO_PAUSE_FOR_UPGRADE command not implemented yet")
 
-	// case "REPLICATE_FROM":
-	// 	return nil, errors.New("REG REPLICATE_FROM command not implemented yet")
+		// case "REPLICATE_FROM":
+		// 	return nil, errors.New("REG REPLICATE_FROM command not implemented yet")
 
+		default:
+			return nil, errors.New("Unknown OpCommand for WALLET OpType")
+		}
+	case types.VotingClosedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "AVAILABILITY_CHECK":
+			return nil, errors.New("REG AVAILABILITY_CHECK command not implemented yet")
+
+		// case "TO_PAUSE_FOR_UPGRADE":
+		// 	return nil, errors.New("REG TO_PAUSE_FOR_UPGRADE command not implemented yet")
+
+		// case "REPLICATE_FROM":
+		// 	return nil, errors.New("REG REPLICATE_FROM command not implemented yet")
+
+		default:
+			return nil, errors.New("Unknown OpCommand for WALLET OpType")
+		}
 	default:
-		return nil, errors.New("Unknown OpCommand for WALLET OpType")
-	}
-}
-
-func executeWalletInstruction(instructionData *instruction.DataFixed, variableMessages [][]byte, cosignerVariableMessages [][]byte, signers, cosigners map[common.Address][]byte) ([]byte, error) {
-	switch utils.OpHashToString(instructionData.OPCommand) {
-	case "KEY_GENERATE":
-		return walletsinstruction.NewWallet(instructionData)
-
-	case "KEY_DELETE":
-		return nil, walletsinstruction.DeleteWallet(instructionData)
-
-	case "KEY_DATA_PROVIDER_RESTORE":
-		return walletsinstruction.KeyDataProviderRestore(instructionData, variableMessages, cosignerVariableMessages, signers, cosigners)
-
-	default:
-		return nil, errors.New("Unknown OpCommand for WALLET OpType")
-	}
-}
-
-func executeXrpInstruction(instructionData *instruction.DataFixed, cosigners map[common.Address][]byte) ([]byte, error) {
-	switch utils.OpHashToString(instructionData.OPCommand) {
-	case "PAY", "REISSUE":
-		return signinginstruction.SignPaymentTransaction(instructionData, cosigners)
-
-	default:
-		return nil, errors.New("Unknown OpCommand for XRP OpType")
+		return nil, errors.New("unexpected submission tag")
 	}
 }
 
-// func executeBtcInstruction(instructionData *instruction.DataFixed) ([]byte, error) {
-// 	switch utils.OpHashToString(instructionData.OPCommand) {
-// 	case "PAY":
-// 		return nil, errors.New("BTC PAY command not implemented yet")
+func walletInstruction(
+	instructionData *instruction.DataFixed,
+	variableMessages [][]byte,
+	signers []common.Address,
+	isSignerDataProvider []bool,
+	submissionTag types.SubmissionTag,
+) ([]byte, []byte, error) {
+	var err error
+	var result []byte
+	var resultStatus []byte
 
-// 	case "REISSUE":
-// 		return nil, errors.New("BTC REISSUE command not implemented yet")
+	switch submissionTag {
+	case types.ThresholdReachedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "KEY_GENERATE":
+			result, err = walletsinstruction.NewWallet(instructionData)
 
-// 	default:
-// 		return nil, errors.New("Unknown OpCommand for BTC OpType")
+		case "KEY_DELETE":
+			err = walletsinstruction.DeleteWallet(instructionData)
 
-// 	}
-// }
+		case "KEY_DATA_PROVIDER_RESTORE":
+			result, resultStatus, err = walletsinstruction.KeyDataProviderRestore(instructionData, variableMessages, signers)
 
-func executeFdcInstruction(instructionData *instruction.DataFixed) ([]byte, error) {
-	switch utils.OpHashToString(instructionData.OPCommand) {
-	case "PROVE":
-		return nil, errors.New("FDC PROVE command not implemented yet")
+		default:
+			err = errors.New("Unknown OpCommand for WALLET OpType")
+		}
+	case types.VotingClosedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "KEY_GENERATE":
+			err = walletsinstruction.ValidateNewWallet(instructionData)
+
+		case "KEY_DELETE":
+			err = walletsinstruction.ValidateDeleteWallet(instructionData)
+
+		case "KEY_DATA_PROVIDER_RESTORE":
+			resultStatus, err = walletsinstruction.ValidateKeyDataProviderRestore(instructionData, variableMessages, signers)
+
+		default:
+			err = errors.New("Unknown OpCommand for WALLET OpType")
+		}
 
 	default:
-		return nil, errors.New("Unknown OpCommand for FDC OpType")
+		err = errors.New("unexpected submission tag")
+	}
+
+	return result, resultStatus, err
+}
+
+func xrpInstruction(instructionData *instruction.DataFixed, signers []common.Address, isSignerDataProvider []bool, submissionTag types.SubmissionTag) ([]byte, error) {
+	var err error
+	var result []byte
+
+	switch submissionTag {
+	case types.ThresholdReachedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "PAY", "REISSUE":
+			result, err = signinginstruction.SignPaymentTransaction(instructionData, signers, isSignerDataProvider)
+
+		default:
+			err = errors.New("Unknown OpCommand for XRP OpType")
+		}
+	case types.VotingClosedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "PAY", "REISSUE":
+			// validation is just retrying to sign
+			result, err = signinginstruction.SignPaymentTransaction(instructionData, signers, isSignerDataProvider)
+
+		default:
+			err = errors.New("Unknown OpCommand for XRP OpType")
+		}
+	default:
+		err = errors.New("unexpected submission tag")
+	}
+
+	return result, err
+}
+
+func fdcInstruction(instructionData *instruction.DataFixed, submissionTag types.SubmissionTag) ([]byte, error) {
+	switch submissionTag {
+	case types.ThresholdReachedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "PROVE":
+			return nil, errors.New("FDC PROVE command not implemented yet")
+
+		default:
+			return nil, errors.New("Unknown OpCommand for FDC OpType")
+		}
+	case types.VotingClosedSubmissionTag:
+		switch utils.OpHashToString(instructionData.OPCommand) {
+		case "PROVE":
+			return nil, errors.New("FDC PROVE command not implemented yet")
+
+		default:
+			return nil, errors.New("Unknown OpCommand for FDC OpType")
+		}
+	default:
+		return nil, errors.New("unexpected submission tag")
 	}
 }
 
-func CheckInstructionData(instructionData *instruction.DataFixed) (*policy.SigningPolicy, error) {
+func checkInstructionData(instructionData *instruction.DataFixed) (*policy.SigningPolicy, error) {
 	if instructionData == nil {
 		return nil, errors.New("instruction data is nil")
 	}
@@ -176,84 +286,4 @@ func CheckInstructionData(instructionData *instruction.DataFixed) (*policy.Signi
 	}
 
 	return activeSigningPolicy, nil
-}
-
-// IsValidSubCommand checks if the OpType and Command is valid for a given operation type
-func isValidCommand(op, command string) bool {
-	validCommands, exists := settings.InstructionOperations[op]
-	if !exists {
-		return false
-	}
-
-	if _, exists := validCommands[command]; exists {
-		return true
-	}
-	return false
-}
-
-// validateRequestSize checks the size of the request fields
-func ValidateInstructionDataSize(instructionData *instruction.DataFixed) error {
-	// Check the size of the different messages
-	messageSizeConstraint := settings.MaxRequestSize[utils.OpHashToString(instructionData.OPType)][utils.OpHashToString(instructionData.OPCommand)]
-	if len(instructionData.OriginalMessage) > messageSizeConstraint.MaxOriginalMessageSize {
-		return status.Error(codes.InvalidArgument, "originalMessage exceeds maximum size")
-	}
-	if len(instructionData.AdditionalFixedMessage) > messageSizeConstraint.MaxAdditionalFixedMessageSize {
-		return status.Error(codes.InvalidArgument, "additionalFixedMessage exceeds maximum size")
-	}
-
-	return nil
-}
-
-func SignaturesToSigners(instructionDataFixed *instruction.DataFixed, variableMessages, signatures [][]byte) (map[common.Address][]byte, error) {
-	if len(variableMessages) != 0 && len(variableMessages) != len(signatures) {
-		return nil, errors.New("the number of variable messages does not match the number of signatures")
-	}
-
-	signers := make(map[common.Address][]byte)
-	for i, signature := range signatures {
-		instructionData := instruction.Data{DataFixed: *instructionDataFixed}
-		if len(variableMessages) != 0 {
-			instructionData.AdditionalVariableMessage = variableMessages[i]
-		}
-
-		hash, err := instructionData.HashForSigning()
-		if err != nil {
-			return nil, err
-		}
-		signer, err := utils.SignatureToSignersAddress(hash[:], signature)
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := signers[signer]; ok {
-			return nil, errors.New("double signing")
-		}
-
-		signers[signer] = signature
-	}
-
-	return signers, nil
-}
-
-type OPTypeCommand struct {
-	Type    string
-	Command string
-}
-
-func CheckDataProvidersThreshold(instructionDataFixed *instruction.DataFixed, signers map[common.Address][]byte, signingPolicy *policy.SigningPolicy) (bool, error) {
-	oPTypeCommand := OPTypeCommand{utils.OpHashToString(instructionDataFixed.OPType), utils.OpHashToString(instructionDataFixed.OPCommand)}
-	switch oPTypeCommand {
-	case OPTypeCommand{"WALLET", "KEY_DATA_PROVIDER_RESTORE"}:
-		return true, nil // todo: or add threshold?
-	default:
-		for signer := range signers {
-			if !slices.Contains(signingPolicy.Voters, signer) {
-				return false, errors.New("signed by an entity not in the signing policy")
-			}
-		}
-
-		weight := policy.WeightOfSigners(signers, signingPolicy)
-
-		return weight >= signingPolicy.Threshold, nil
-	}
 }

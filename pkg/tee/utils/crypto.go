@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"tee-node/api/types"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/pkg/errors"
 
 	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -137,6 +139,19 @@ func GetXrpAddressFromPubkey(publicKey []byte) (string, error) {
 	address := Base58Encode(accBytes, XRP_ALPHABET)
 
 	return address, nil
+}
+
+func ParsePubKeys(pubKeys []wallet.PublicKey) ([]*ecdsa.PublicKey, error) {
+	parsedPubKeys := make([]*ecdsa.PublicKey, len(pubKeys))
+	var err error
+	for i, key := range pubKeys {
+		parsedPubKeys[i], err = types.ParsePubKey(types.ECDSAPublicKey(key))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return parsedPubKeys, nil
 }
 
 // type Hashable interface {

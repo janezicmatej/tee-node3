@@ -1,6 +1,7 @@
 package getactions
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"tee-node/api/types"
 	"tee-node/pkg/tee/node"
@@ -28,12 +29,12 @@ func TestGetWalletPackage(t *testing.T) {
 	mockKeyId1 := uint64(1)
 	walletProofs := make(map[common.Hash]wallet.ITeeWalletKeyManagerKeyExistence)
 
-	walletProofs[mockWalletId1] = testutils.CreateMockWallet(t, myTeeId, mockWalletId1, mockKeyId1, epochId, privKeys[0], nil, nil)
+	walletProofs[mockWalletId1] = testutils.CreateMockWallet(t, myTeeId, mockWalletId1, mockKeyId1, epochId, []*ecdsa.PrivateKey{privKeys[0]}, nil)
 
 	mockWalletId2 := common.HexToHash("0xabcdefab")
 	mockKeyId2 := uint64(2)
 
-	walletProofs[mockWalletId2] = testutils.CreateMockWallet(t, myTeeId, mockWalletId2, mockKeyId2, epochId, privKeys[1], nil, nil)
+	walletProofs[mockWalletId2] = testutils.CreateMockWallet(t, myTeeId, mockWalletId2, mockKeyId2, epochId, []*ecdsa.PrivateKey{privKeys[1]}, nil)
 
 	walletsPackage, err := GetKeyInfoPackage()
 	require.NoError(t, err)

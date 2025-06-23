@@ -57,12 +57,9 @@ func CreateNewWallet(walletInfo wallet.ITeeWalletKeyManagerKeyGenerate) (*Wallet
 		return nil, err
 	}
 
-	adminsPubKeys := make([]*ecdsa.PublicKey, len(walletInfo.ConfigConstants.AdminsPublicKeys))
-	for i, key := range walletInfo.ConfigConstants.AdminsPublicKeys {
-		adminsPubKeys[i], err = types.ParsePubKey(types.ECDSAPublicKey(key))
-		if err != nil {
-			return nil, err
-		}
+	adminsPubKeys, err := utils.ParsePubKeys(walletInfo.ConfigConstants.AdminsPublicKeys)
+	if err != nil {
+		return nil, err
 	}
 
 	newWallet := &Wallet{

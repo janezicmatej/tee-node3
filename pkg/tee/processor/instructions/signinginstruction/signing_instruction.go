@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func SignPaymentTransaction(instructionData *instruction.DataFixed, cosigners map[common.Address][]byte) ([]byte, error) {
+func SignPaymentTransaction(instructionData *instruction.DataFixed, signers []common.Address, isSignerDataProvider []bool) ([]byte, error) {
 	// TODO:  ParseSignPaymentRequest must return keyID
 	originalMessage, err := types.ParseSignPaymentRequest(instructionData)
 	if err != nil {
@@ -33,7 +33,7 @@ func SignPaymentTransaction(instructionData *instruction.DataFixed, cosigners ma
 		return nil, err
 	}
 
-	check, err := signing.CheckCosigners(cosigners, signingWallet.Cosigners, signingWallet.CosignersThreshold)
+	check, err := signing.CheckCosigners(signers, isSignerDataProvider, signingWallet.Cosigners, signingWallet.CosignersThreshold)
 	if err != nil {
 		return nil, err
 	}

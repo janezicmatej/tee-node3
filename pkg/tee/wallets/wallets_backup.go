@@ -336,7 +336,7 @@ func DecryptSplit(encryptedShare []byte, privKeyECDSA *ecdsa.PrivateKey) (*KeySp
 
 func RecoverWallet(
 	keyShares []*KeySplit,
-	backupMetaData WalletBackupMetaData,
+	backupMetaData *WalletBackupMetaData,
 ) (*Wallet, error) {
 	providersKeyShares := make([]*KeySplit, 0)
 	adminsKeyShares := make([]*KeySplit, 0)
@@ -408,7 +408,7 @@ func RecoverWallet(
 	}, nil
 }
 
-func CheckKeyShares(splits []*KeySplit, backupMetaData WalletBackupMetaData) error {
+func CheckKeyShares(splits []*KeySplit, backupMetaData *WalletBackupMetaData) error {
 	if len(splits) == 0 {
 		return errors.New("shares should not be empty")
 	}

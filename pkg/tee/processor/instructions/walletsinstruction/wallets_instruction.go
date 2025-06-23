@@ -15,6 +15,7 @@ import (
 	"tee-node/api/types"
 	"tee-node/pkg/tee/node"
 	"tee-node/pkg/tee/policy"
+	"tee-node/pkg/tee/utils"
 	"tee-node/pkg/tee/wallets"
 )
 
@@ -58,6 +59,38 @@ func NewWallet(instructionData *instruction.DataFixed) ([]byte, error) {
 	return existenceProofEncoded, nil
 }
 
+func ValidateNewWallet(instructionData *instruction.DataFixed) error {
+	newWalletRequest, err := types.ParseNewWalletRequest(instructionData)
+	if err != nil {
+		return err
+	}
+
+	err = types.CheckNewWalletRequest(newWalletRequest)
+	if err != nil {
+		return err
+	}
+	if newWalletRequest.TeeId != node.GetTeeId() {
+		return errors.New("tee id does not match")
+	}
+
+	_, err = utils.ParsePubKeys(newWalletRequest.ConfigConstants.AdminsPublicKeys)
+	if err != nil {
+		return err
+	}
+
+	wallets.Storage.RLock()
+	walletNonce, err := wallets.Storage.GetNonce(wallets.WalletKeyIdPair{WalletId: newWalletRequest.WalletId, KeyId: newWalletRequest.KeyId})
+	wallets.Storage.RUnlock()
+	if err != nil {
+		return err
+	}
+	if walletNonce != 0 {
+		return errors.New("wallet nonce already changed")
+	}
+
+	return nil
+}
+
 func DeleteWallet(instructionData *instruction.DataFixed) error {
 	delWalletRequest, err := types.ParseDeleteWalletRequest(instructionData)
 	if err != nil {
@@ -79,169 +112,266 @@ func DeleteWallet(instructionData *instruction.DataFixed) error {
 	return nil
 }
 
-func KeyMachineBackupRemove(instructionData *instruction.DataFixed) ([]byte, error) {
-	return nil, errors.New("WALLET KEY_MACHINE_BACKUP_REMOVE command not implemented yet")
+func ValidateDeleteWallet(instructionData *instruction.DataFixed) error {
+	delWalletRequest, err := types.ParseDeleteWalletRequest(instructionData)
+	if err != nil {
+		return err
+	}
+	walletKeyId := wallets.WalletKeyIdPair{WalletId: delWalletRequest.WalletId, KeyId: delWalletRequest.KeyId}
+
+	exists := wallets.Storage.WalletExists(walletKeyId)
+	if exists {
+		return errors.New("wallet not deleted, still exists")
+	}
+
+	wallets.Storage.RLock()
+	walletNonce, err := wallets.Storage.GetNonce(walletKeyId)
+	wallets.Storage.RUnlock()
+	if err != nil {
+		return err
+	}
+	if walletNonce != delWalletRequest.Nonce.Uint64() {
+		return errors.New("wallet nonce already changed")
+	}
+
+	return nil
 }
 
 func KeyDataProviderRestore(instructionData *instruction.DataFixed,
-	variableMessages, adminVariableMessages [][]byte,
-	providers, admins map[common.Address][]byte) ([]byte, error) {
-	restoreWalletRequest, err := types.ParseKeyDataProviderRestoreRequest(instructionData)
+	variableMessages [][]byte,
+	signers []common.Address,
+) ([]byte, []byte, error) {
+	walletBackupMetadata, newWalletNonce, signersBothRoles, err := keyDataProviderRestoreCheck(instructionData, signers)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
-	var walletBackupMetadata wallets.WalletBackupMetaData
-	err = json.Unmarshal(instructionData.AdditionalFixedMessage, &walletBackupMetadata)
-	if err != nil {
-		return nil, err
-	}
-
-	walletBackupId, err := backupRequestToBackupId(&restoreWalletRequest)
-	if err != nil {
-		return nil, err
-	}
-	if walletBackupMetadata.WalletBackupId != walletBackupId {
-		return nil, errors.New("wallet backup id in the metadata does not match the given id")
-	}
+	walletBackupId := walletBackupMetadata.WalletBackupId
 	walletKeyId := wallets.WalletKeyIdPair{WalletId: walletBackupId.WalletId, KeyId: walletBackupId.KeyId}
-	newWalletNonce := restoreWalletRequest.Nonce.Uint64()
 
 	wallets.Storage.RLock()
 	err = wallets.Storage.CheckNonce(walletKeyId, newWalletNonce)
 	wallets.Storage.RUnlock()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	err = checkAdmins(admins, walletBackupMetadata.AdminsPublicKeys, walletBackupMetadata.AdminsThreshold)
+	keySplits, resultStatus, err := processKeySplitMessages(variableMessages, signersBothRoles, walletBackupId)
 	if err != nil {
-		return nil, err
-	}
-
-	policyAtBackup, err := policy.Storage.GetSigningPolicy(walletBackupId.RewardEpochID)
-	if err != nil {
-		return nil, err
-	}
-	err = checkProviders(providers, policyAtBackup.Voters) // threshold is checked at recover
-	if err != nil {
-		return nil, err
-	}
-	keySplits, err := processKeySplitMessages(variableMessages, adminVariableMessages, walletBackupId)
-	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	newWallet, err := wallets.RecoverWallet(keySplits, walletBackupMetadata)
 	if err != nil {
-		return nil, err
+		return nil, resultStatus, err
 	}
 
 	wallets.Storage.Lock()
 	defer wallets.Storage.Unlock()
 	if wallets.Storage.WalletExists(walletKeyId) {
-		return nil, errors.New("wallet with given walletId and keyId already exists")
+		return nil, nil, errors.New("wallet with given walletId and keyId already exists")
 	}
 
 	wallets.Storage.UpdateNonce(walletKeyId, newWalletNonce)
 	err = wallets.Storage.StoreWallet(newWallet)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// get stored wallet to also have the correct walletStatus
 	storedWallet, err := wallets.Storage.GetWallet(walletKeyId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	existenceProof := wallets.WalletToKeyExistenceProof(storedWallet, node.GetTeeId())
 	existenceProofEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, existenceProof)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	return existenceProofEncoded, resultStatus, nil
+}
+
+func ValidateKeyDataProviderRestore(instructionData *instruction.DataFixed,
+	variableMessages [][]byte,
+	signers []common.Address,
+) ([]byte, error) {
+	walletBackupMetadata, restoredWalletNonce, signersBothRoles, err := keyDataProviderRestoreCheck(instructionData, signers)
+	if err != nil {
+		return nil, err
+	}
+	walletBackupId := walletBackupMetadata.WalletBackupId
+	walletKeyId := wallets.WalletKeyIdPair{WalletId: walletBackupId.WalletId, KeyId: walletBackupId.KeyId}
+
+	keySplits, resultStatus, err := processKeySplitMessages(variableMessages, signersBothRoles, walletBackupId)
+	if err != nil {
 		return nil, err
 	}
 
-	return existenceProofEncoded, nil
+	_, err = wallets.RecoverWallet(keySplits, walletBackupMetadata)
+	if err != nil {
+		return resultStatus, err
+	}
+
+	wallets.Storage.RLock()
+	exists := wallets.Storage.WalletExists(walletKeyId)
+	checkNonce, err := wallets.Storage.GetNonce(walletKeyId)
+	wallets.Storage.RUnlock()
+	if !exists {
+		return nil, errors.New("wallet does not exists")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if checkNonce != restoredWalletNonce {
+		return nil, errors.New("wallet nonce already changed")
+	}
+
+	return resultStatus, nil
 }
 
-func processKeySplitMessages(variableMessages, adminVariableMessages [][]byte, walletBackupId wallets.WalletBackupId) ([]*wallets.KeySplit, error) {
+func keyDataProviderRestoreCheck(instructionData *instruction.DataFixed, signers []common.Address) (*wallets.WalletBackupMetaData, uint64, []bool, error) {
+	restoreWalletRequest, err := types.ParseKeyDataProviderRestoreRequest(instructionData)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	var walletBackupMetadata wallets.WalletBackupMetaData
+	err = json.Unmarshal(instructionData.AdditionalFixedMessage, &walletBackupMetadata)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	walletBackupId, err := backupRequestToBackupId(&restoreWalletRequest)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	if walletBackupMetadata.WalletBackupId != walletBackupId {
+		return nil, 0, nil, errors.New("wallet backup id in the metadata does not match the given id")
+	}
+	restoredWalletNonce := restoreWalletRequest.Nonce.Uint64()
+
+	policyAtBackup, err := policy.Storage.GetSigningPolicy(walletBackupId.RewardEpochID)
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	isProviderAndAdmin, err := checkSigners(signers, policyAtBackup.Voters, walletBackupMetadata.AdminsPublicKeys, walletBackupMetadata.AdminsThreshold) // threshold is checked at recover
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	return &walletBackupMetadata, restoredWalletNonce, isProviderAndAdmin, nil
+}
+
+func processKeySplitMessages(variableMessages [][]byte, isProviderAndAdmin []bool, walletBackupId wallets.WalletBackupId) ([]*wallets.KeySplit, []byte, error) {
+	allKeySplits := make([]*wallets.KeySplit, 0)
+	duplicateCheck := make(map[common.Hash]int)
+
+	errorPositions := make([]int, 0)
+	errorLogs := make([]string, 0)
+	for i, keySplitMessage := range variableMessages {
+		keySplits, err := processKeySplitMessage(keySplitMessage, walletBackupId, isProviderAndAdmin[i])
+		if err != nil {
+			errorPositions = append(errorPositions, i)
+			errorLogs = append(errorLogs, err.Error())
+			continue
+		}
+
+		for _, keySplit := range keySplits {
+			keySplitHash, err := keySplit.HashForSigning()
+			if err != nil {
+				errorPositions = append(errorPositions, i)
+				errorLogs = append(errorLogs, err.Error())
+				continue
+			}
+			if j, ok := duplicateCheck[keySplitHash]; ok {
+				errorPositions = append(errorPositions, i, j)
+				err = errors.New("duplicate key split")
+				errorLogs = append(errorLogs, err.Error(), err.Error())
+				continue
+			}
+			duplicateCheck[keySplitHash] = i
+		}
+
+		allKeySplits = append(allKeySplits, keySplits...)
+	}
+
+	resultStatus, err := json.Marshal(types.KeyDataProviderRestoreResultStatus{ErrorPositions: errorPositions, ErrorLogs: errorLogs})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return allKeySplits, resultStatus, nil
+}
+
+func processKeySplitMessage(keySplitMessage []byte, walletBackupId wallets.WalletBackupId, isProviderAndAdmin bool) ([]*wallets.KeySplit, error) {
+	keySplitsPlaintext, err := node.Decrypt(keySplitMessage)
+	if err != nil {
+		return nil, err
+	}
+
 	keySplits := make([]*wallets.KeySplit, 0)
-	duplicateCheck := make(map[common.Hash]bool)
-	for i, keySplitMessage := range append(variableMessages, adminVariableMessages...) {
-		keySplit, keySplitHash, err := processKeySplitMessage(keySplitMessage, walletBackupId, i >= len(variableMessages))
+	if !isProviderAndAdmin {
+		var keySplit wallets.KeySplit
+		err = json.Unmarshal(keySplitsPlaintext, &keySplit)
 		if err != nil {
 			return nil, err
 		}
-
-		if _, ok := duplicateCheck[keySplitHash]; ok {
-			return nil, errors.New("duplicate key split")
+		keySplits = append(keySplits, &keySplit)
+	} else {
+		var twoKeySplits [2]wallets.KeySplit
+		err = json.Unmarshal(keySplitsPlaintext, &twoKeySplits)
+		if err != nil {
+			return nil, err
 		}
-		duplicateCheck[keySplitHash] = true
-		keySplits = append(keySplits, keySplit)
+		keySplits = append(keySplits, &twoKeySplits[0])
+		keySplits = append(keySplits, &twoKeySplits[1])
+	}
+
+	for _, keySplit := range keySplits {
+		if keySplit.WalletBackupId != walletBackupId {
+			return nil, errors.New("wallet backup id in the share does not match the id in the key split")
+		}
+
+		err = keySplit.VerifySignature()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return keySplits, nil
 }
 
-func processKeySplitMessage(keySplitMessage []byte, walletBackupId wallets.WalletBackupId, isAdmin bool) (*wallets.KeySplit, common.Hash, error) {
-	keySplitPlaintext, err := node.Decrypt(keySplitMessage)
-	if err != nil {
-		return nil, common.Hash{}, err
-	}
-
-	var keySplit wallets.KeySplit
-	err = json.Unmarshal(keySplitPlaintext, &keySplit)
-	if err != nil {
-		return nil, common.Hash{}, err
-	}
-
-	if keySplit.WalletBackupId != walletBackupId {
-		return nil, common.Hash{}, errors.New("wallet backup id in the share does not match the id in the key split")
-	}
-	if keySplit.IsAdmin != isAdmin {
-		return nil, common.Hash{}, errors.New("error in the the key split admin vs provider role")
-	}
-
-	err = keySplit.VerifySignature()
-	if err != nil {
-		return nil, common.Hash{}, err
-	}
-
-	keySplitHash, err := keySplit.HashForSigning()
-	if err != nil {
-		return nil, common.Hash{}, err
-	}
-
-	return &keySplit, keySplitHash, nil
-}
-func checkAdmins(givenAdmins map[common.Address][]byte, expectedAdmins []types.ECDSAPublicKey, threshold uint64) error {
+func checkSigners(signers []common.Address, expectedProviders []common.Address, expectedAdmins []types.ECDSAPublicKey, adminThreshold uint64) ([]bool, error) {
 	adminsAddresses := make(map[common.Address]bool)
+	countAdmins := uint64(0)
 	for _, admin := range expectedAdmins {
 		adminPubKey, err := types.ParsePubKey(admin)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		adminsAddresses[crypto.PubkeyToAddress(*adminPubKey)] = true
-	}
-
-	for givenAdmin := range givenAdmins {
-		if _, ok := adminsAddresses[givenAdmin]; !ok {
-			return errors.New("signed by a non-admin")
-		}
-	}
-	if uint64(len(givenAdmins)) < threshold {
-		return errors.New("admin threshold not reached")
-	}
-	return nil
-}
-
-func checkProviders(givenProviders map[common.Address][]byte, expectedProviders []common.Address) error {
-	for givenProvider := range givenProviders {
-		if ok := slices.Contains(expectedProviders, givenProvider); !ok {
-			return errors.New("signed by a non-provider")
+		adminAddress := crypto.PubkeyToAddress(*adminPubKey)
+		adminsAddresses[adminAddress] = true
+		if slices.Contains(signers, adminAddress) {
+			countAdmins++
 		}
 	}
 
-	return nil
+	if countAdmins < adminThreshold {
+		return nil, errors.New("admin threshold not reached")
+	}
+
+	isProviderAndAdmin := make([]bool, len(signers))
+	for i, signer := range signers {
+		isProvider := slices.Contains(expectedProviders, signer)
+		_, isAdmin := adminsAddresses[signer]
+		if isProvider && isAdmin {
+			isProviderAndAdmin[i] = true
+		}
+		if !isProvider && !isAdmin {
+			return nil, errors.New("signed by an entity that is nether a provider nor an admin")
+		}
+	}
+
+	return isProviderAndAdmin, nil
 }
 
 func backupRequestToBackupId(req *wallet.ITeeWalletBackupManagerKeyDataProviderRestore) (wallets.WalletBackupId, error) {

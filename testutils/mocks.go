@@ -2,9 +2,9 @@ package testutils
 
 import (
 	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"tee-node/api/types"
 	"tee-node/pkg/tee/processor/instructions/walletsinstruction"
@@ -22,55 +22,16 @@ import (
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 )
 
-// Todo: I want to extract some logic for generating mock policies, wallets, etc. into this file.
-
-func BuildMockInstruction(OpType string, OpCommand string, OriginalMessage []byte, additionalFixedMessageRaw interface{}, privKey *ecdsa.PrivateKey, teeId common.Address, instructionId string, rewardEpochId uint32) (*instruction.Instruction, error) {
-	AdditionalFixedMessage, err := json.Marshal(additionalFixedMessageRaw)
-	if err != nil {
-		return nil, err
-	}
-
-	instructionData := instruction.Data{
-		DataFixed: instruction.DataFixed{
-			InstructionID:          common.HexToHash(instructionId),
-			TeeID:                  teeId,
-			RewardEpochID:          big.NewInt(int64(rewardEpochId)),
-			OPType:                 utils.StringToOpHash(OpType),
-			OPCommand:              utils.StringToOpHash(OpCommand),
-			OriginalMessage:        OriginalMessage,
-			AdditionalFixedMessage: AdditionalFixedMessage,
-		},
-		AdditionalVariableMessage: []byte(""),
-	}
-	nonceBytes, _ := GenerateRandomBytes(32)
-
-	sig, err := Sign(&instructionData, privKey)
-	if err != nil {
-		fmt.Printf("Error signing instruction: %v\n", err)
-		return nil, err
-	}
-
-	return &instruction.Instruction{
-		Challenge: common.BytesToHash(nonceBytes),
-		Data:      instructionData,
-		Signature: sig,
-	}, nil
-
-}
-
 func CreateMockWallet(t *testing.T, nodeId common.Address, walletId common.Hash, keyId uint64, rewardEpochId uint32,
-	privKey *ecdsa.PrivateKey, adminPrivKeys, cosignerPrivKeys []*ecdsa.PrivateKey) wallet.ITeeWalletKeyManagerKeyExistence {
+	adminPrivKeys, cosignerPrivKeys []*ecdsa.PrivateKey) wallet.ITeeWalletKeyManagerKeyExistence {
+
 	instructionIdBytes, _ := GenerateRandomBytes(32)
 
+	require.Less(t, 0, len(adminPrivKeys))
 	adminPubKeys := make([]wallet.PublicKey, 0)
-	if len(adminPrivKeys) > 0 {
-		for _, adminPrivKey := range adminPrivKeys {
-			adminPubKey := types.PubKeyToStruct(&adminPrivKey.PublicKey)
-			adminPubKeys = append(adminPubKeys, wallet.PublicKey(adminPubKey))
-		}
-	} else {
-		pubKey := types.PubKeyToStruct(&privKey.PublicKey)
-		adminPubKeys = []wallet.PublicKey{wallet.PublicKey(pubKey)}
+	for _, adminPrivKey := range adminPrivKeys {
+		adminPubKey := types.PubKeyToStruct(&adminPrivKey.PublicKey)
+		adminPubKeys = append(adminPubKeys, wallet.PublicKey(adminPubKey))
 	}
 
 	cosignerPubKeys := make([]common.Address, 0)
@@ -95,18 +56,18 @@ func CreateMockWallet(t *testing.T, nodeId common.Address, walletId common.Hash,
 	encoded, err := abi.Arguments{wallet.MessageArguments[wallet.KeyGenerate]}.Pack(request)
 	require.NoError(t, err)
 
-	instruction, err := BuildMockInstruction("WALLET",
-		"KEY_GENERATE",
-		encoded,
-		interface{}(nil),
-		privKey,
-		nodeId,
-		hex.EncodeToString(instructionIdBytes),
-		rewardEpochId,
-	)
+	instructionDataFixed := instruction.DataFixed{
+		InstructionID:          common.BytesToHash(instructionIdBytes),
+		TeeID:                  nodeId,
+		RewardEpochID:          big.NewInt(int64(rewardEpochId)),
+		OPType:                 utils.StringToOpHash("WALLET"),
+		OPCommand:              utils.StringToOpHash("KEY_GENERATE"),
+		OriginalMessage:        encoded,
+		AdditionalFixedMessage: nil,
+	}
 	require.NoError(t, err)
 
-	walletProofBytes, err := walletsinstruction.NewWallet(&instruction.Data.DataFixed)
+	walletProofBytes, err := walletsinstruction.NewWallet(&instructionDataFixed)
 	require.NoError(t, err)
 	walletExistenceProof, err := structs.Decode[wallet.ITeeWalletKeyManagerKeyExistence](wallet.KeyExistenceStructArg, walletProofBytes)
 
@@ -134,8 +95,9 @@ func BuildMockPaymentOriginalMessage(t *testing.T, mockWallet common.Hash) []byt
 }
 
 func BuildMockQueuedActionInstruction(opType string, opCommand string, originalMessage []byte,
-	privKeys, cosignersPrivKeys []*ecdsa.PrivateKey, teeId common.Address, rewardEpochId uint32,
-	additionalFixedMessageRaw interface{}, variableMessages, cosignersVariableMessages []interface{},
+	privKeys []*ecdsa.PrivateKey, teeId common.Address, rewardEpochId uint32,
+	additionalFixedMessageRaw interface{}, variableMessages []interface{},
+	submissionTag types.SubmissionTag,
 ) (*types.QueuedAction, error) {
 	instructionId, _ := GenerateRandomBytes(32)
 	additionalFixedMessage, err := json.Marshal(additionalFixedMessageRaw)
@@ -186,44 +148,26 @@ func BuildMockQueuedActionInstruction(opType string, opCommand string, originalM
 			return nil, err
 		}
 	}
-	cosignerSignatures := make([][]byte, len(cosignersPrivKeys))
-	var cosignerAdditionalVariableMessages [][]byte
-	if len(variableMessages) != 0 {
-		cosignerAdditionalVariableMessages = make([][]byte, len(cosignersPrivKeys))
-	}
 
-	for i, privKey := range cosignersPrivKeys {
-		instructionData := instruction.Data{
-			DataFixed:                 instructionDataFixed,
-			AdditionalVariableMessage: []byte(""),
-		}
-		if len(variableMessages) != 0 {
-			switch variableMessages[i].(type) {
-			case []byte:
-				instructionData.AdditionalVariableMessage = cosignersVariableMessages[i].([]byte)
-			default:
-				instructionData.AdditionalVariableMessage, err = json.Marshal(cosignersVariableMessages[i])
-				if err != nil {
-					return nil, err
-				}
-			}
-			cosignerAdditionalVariableMessages[i] = instructionData.AdditionalVariableMessage
-		}
-		cosignerSignatures[i], err = Sign(&instructionData, privKey)
+	timestamps := make([]uint64, len(signatures))
+	for i := range timestamps {
+		randInt, err := rand.Int(rand.Reader, big.NewInt(10000000))
 		if err != nil {
 			return nil, err
 		}
+		timestamps[i] = randInt.Uint64()
 	}
 
 	action := types.QueuedAction{
 		Data: types.QueueActionData{
-			Type:    types.InstructionType,
-			Message: instructionDataFixedEncoded,
+			Type:          types.InstructionType,
+			Message:       instructionDataFixedEncoded,
+			SubmissionTag: submissionTag,
 		},
-		Signatures:                         signatures,
-		AdditionalVariableMessages:         additionalVariableMessages,
-		CosignerSignatures:                 cosignerSignatures,
-		CosignerAdditionalVariableMessages: cosignerAdditionalVariableMessages,
+		AdditionalVariableMessages: additionalVariableMessages,
+		Timestamps:                 timestamps,
+		AdditionalActionData:       nil,
+		Signatures:                 signatures,
 	}
 
 	return &action, nil
