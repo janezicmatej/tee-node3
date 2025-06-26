@@ -1,0 +1,172 @@
+package processor
+
+import (
+	"encoding/json"
+	"tee-node/internal/node"
+	"tee-node/internal/processor/direct"
+	"tee-node/internal/processor/instructions"
+	"tee-node/internal/settings"
+	"time"
+
+	"tee-node/pkg/types"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flare-foundation/go-flare-common/pkg/logger"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/pkg/errors"
+)
+
+var emptyQueuedActionInfo = types.ActionInfo{}
+
+func RunTeeProcessor(proxyUrl string) {
+	go runQueueProcessing(proxyUrl, "main")
+	runQueueProcessing(proxyUrl, "read")
+}
+
+func runQueueProcessing(proxyUrl string, queueId string) {
+	for {
+		var action *types.Action
+		var result *types.ActionResult
+		var response *types.ActionResponse
+
+		actionInfo, err := getActionInfo(proxyUrl + "/queue/" + queueId)
+		if err != nil {
+			logger.Errorf("error getting action info: %v", err)
+			goto sleep
+		}
+		if *actionInfo == emptyQueuedActionInfo {
+			goto sleep
+		}
+
+		action, err = getAction(proxyUrl+"/dequeue", actionInfo)
+		if err != nil {
+			logger.Errorf("error getting action: %v", err)
+			goto sleep
+		}
+
+		checkAndAdapt(action)
+
+		result, err = processAction(action)
+		if err != nil {
+			result.Log = err.Error()
+			result.Status = false
+			logger.Errorf("error processing action: %v", err)
+		}
+
+		response = &types.ActionResponse{
+			ActionId:      actionInfo.ActionId,
+			SubmissionTag: actionInfo.SubmissionTag,
+			Result:        *result,
+		}
+		err = postActionResponse(proxyUrl+"/result", response)
+		if err != nil {
+			logger.Errorf("error posting result: %v", err)
+		}
+
+	sleep:
+		time.Sleep(settings.QueuedActionsSleepTime)
+	}
+}
+
+func checkAndAdapt(action *types.Action) {
+	if len(action.AdditionalVariableMessages) == 0 {
+		action.AdditionalVariableMessages = make([][]byte, len(action.Signatures))
+	}
+	// todo: additional checks?
+}
+
+func processAction(action *types.Action) (*types.ActionResult, error) {
+	var err error
+	response := &types.ActionResult{}
+
+	switch action.Data.Type {
+	case types.InstructionType:
+		instructionData, err := parse[instruction.DataFixed](action.Data.Message)
+		if err != nil {
+			response.Log = err.Error()
+			return response, err
+		}
+
+		message, resultStatus, err := instructions.ProcessInstruction(
+			instructionData,
+			action.AdditionalVariableMessages,
+			action.Signatures,
+			action.Data.SubmissionTag,
+			action.Timestamps,
+		)
+		response.AdditionalResultStatus = resultStatus
+		if err != nil {
+			response.Log = err.Error()
+			return response, err
+		}
+
+		response.OPCommand = instructionData.OPCommand
+		response.OPType = instructionData.OPType
+		response.ResultData = types.ActionResultData{Message: message}
+
+	case types.DirectType:
+		getData, err := parse[types.DirectInstructionData](action.Data.Message)
+		if err != nil {
+			response.Log = err.Error()
+			return response, err
+		}
+
+		message, err := direct.ProcessDirectInstruction(getData)
+		if err != nil {
+			response.Log = err.Error()
+			return response, err
+		}
+
+		response.OPCommand = getData.OPCommand
+		response.OPType = getData.OPType
+		response.ResultData = types.ActionResultData{Message: message}
+
+	default:
+		err = errors.New("invalid queued action type")
+		response.Log = err.Error()
+		return response, err
+	}
+
+	if len(response.ResultData.Message) != 0 {
+		msgHash := crypto.Keccak256Hash(response.ResultData.Message)
+
+		response.ResultData.Signature, err = node.Sign(msgHash[:])
+		if err != nil {
+			response.Log = err.Error()
+			return response, err
+		}
+	}
+
+	response.Status = true
+
+	return response, nil
+}
+
+type ValidRequestType interface {
+	instruction.DataFixed | types.DirectInstructionData
+}
+
+func parse[T ValidRequestType](message []byte) (*T, error) {
+	var maxBodySize int
+	switch any(new(T)).(type) {
+	case *instruction.DataFixed:
+		maxBodySize = settings.MaxInstructionSize
+	case *types.DirectInstructionData:
+		maxBodySize = settings.MaxActionSize
+	default:
+		return nil, errors.New("Invalid request type")
+	}
+
+	// Check if the request body size exceeds the limit
+	if len(message) > maxBodySize {
+		return nil, errors.New("request too large")
+	}
+
+	var req T
+	err := json.Unmarshal(message, &req)
+	if err != nil {
+		return nil, errors.Errorf("invalid JSON, %v", err)
+	}
+
+	return &req, nil
+}

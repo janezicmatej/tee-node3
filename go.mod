@@ -6,7 +6,6 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/flare-foundation/go-flare-common v1.2.1-0.20250618110628-2a6ddb723dd6
-	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/go-tpm-tools v0.4.4
 	github.com/gorilla/mux v1.8.1
@@ -15,6 +14,7 @@ require (
 	golang.org/x/crypto v0.37.0
 	gorm.io/gorm v1.25.12
 )
+
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
@@ -33,6 +33,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-sql-driver/mysql v1.9.2 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/go-configfs-tsm v0.2.2 // indirect
