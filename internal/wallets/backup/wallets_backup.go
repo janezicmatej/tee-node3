@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"slices"
 
-	"tee-node/internal/settings"
-	"tee-node/internal/wallets"
-	"tee-node/pkg/types"
-	"tee-node/pkg/utils"
-	"tee-node/pkg/backup"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/internal/wallets"
+	"github.com/flare-foundation/tee-node/pkg/backup"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

@@ -3,23 +3,22 @@ package testutils
 import (
 	"bytes"
 	"crypto/ecdsa"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
 	"math/rand"
 	"net/http"
-	"tee-node/internal/policy"
-	"tee-node/internal/settings"
-	"tee-node/internal/wallets"
-	"tee-node/pkg/utils"
 
-	cryptorand "crypto/rand"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/internal/wallets"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
-	"tee-node/pkg/types"
 )
 
 func GenerateRandomBytes(n int) ([]byte, error) {

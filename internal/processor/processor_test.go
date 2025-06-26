@@ -13,24 +13,23 @@ import (
 	"testing"
 	"time"
 
-	"tee-node/pkg/types"
-	"tee-node/pkg/backup"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
+
 	commonwallet "github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/testutils"
+	"github.com/flare-foundation/tee-node/internal/wallets"
+	"github.com/flare-foundation/tee-node/pkg/backup"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
-
-	"tee-node/internal/node"
-	"tee-node/internal/policy"
-	"tee-node/internal/testutils"
-	"tee-node/internal/wallets"
-	"tee-node/pkg/utils"
 )
 
 const proxyPort = 5500

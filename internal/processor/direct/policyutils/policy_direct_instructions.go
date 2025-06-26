@@ -3,11 +3,11 @@ package policyutils
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"tee-node/internal/policy"
-	"tee-node/internal/settings"
-	"tee-node/pkg/utils"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

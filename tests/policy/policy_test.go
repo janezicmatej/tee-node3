@@ -8,15 +8,13 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/flare-foundation/go-flare-common/pkg/database"
 	"github.com/stretchr/testify/require"
 
-	"github.com/flare-foundation/go-flare-common/pkg/database"
-
-	"tee-node/internal/policy"
-	"tee-node/internal/processor/direct/policyutils"
-	"tee-node/internal/settings"
-
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/processor/direct/policyutils"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
 var params = &PolicyHistoryParams{

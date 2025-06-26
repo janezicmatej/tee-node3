@@ -2,13 +2,13 @@ package instructions
 
 import (
 	"encoding/json"
-	"tee-node/internal/node"
-	"tee-node/internal/policy"
-	"tee-node/internal/processor/instructions/signutils"
-	"tee-node/internal/processor/instructions/walletutils"
-	"tee-node/pkg/utils"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/processor/instructions/signutils"
+	"github.com/flare-foundation/tee-node/internal/processor/instructions/walletutils"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"

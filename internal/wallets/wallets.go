@@ -3,9 +3,9 @@ package wallets
 import (
 	"crypto/ecdsa"
 	"math/big"
-	"tee-node/pkg/utils"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

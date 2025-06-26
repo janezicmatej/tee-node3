@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
-	"tee-node/pkg/types"
-	"tee-node/pkg/utils"
+
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

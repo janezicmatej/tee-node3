@@ -3,22 +3,21 @@ package walletutils
 import (
 	"encoding/json"
 	"slices"
-	"tee-node/internal/node"
-	"tee-node/internal/policy"
-	"tee-node/internal/wallets"
-	"tee-node/internal/wallets/backup"
-	"tee-node/pkg/utils"
-	pkgbackup "tee-node/pkg/backup"
+
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/wallets"
+	"github.com/flare-foundation/tee-node/internal/wallets/backup"
+	pkgbackup "github.com/flare-foundation/tee-node/pkg/backup"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
-	commonwallet "github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/pkg/errors"
-
-	"tee-node/pkg/types"
 )
 
 func NewWallet(instructionData *instruction.DataFixed) ([]byte, error) {
@@ -53,7 +52,7 @@ func NewWallet(instructionData *instruction.DataFixed) ([]byte, error) {
 	}
 
 	existenceProof := wallets.WalletToKeyExistenceProof(storedWallet, node.GetTeeId())
-	existenceProofEncoded, err := structs.Encode(commonwallet.KeyExistenceStructArg, existenceProof)
+	existenceProofEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, existenceProof)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +184,7 @@ func KeyDataProviderRestore(instructionData *instruction.DataFixed,
 		return nil, nil, err
 	}
 	existenceProof := wallets.WalletToKeyExistenceProof(storedWallet, node.GetTeeId())
-	existenceProofEncoded, err := structs.Encode(commonwallet.KeyExistenceStructArg, existenceProof)
+	existenceProofEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, existenceProof)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -376,7 +375,7 @@ func checkSigners(signers []common.Address, expectedProviders []common.Address, 
 	return isProviderAndAdmin, nil
 }
 
-func backupRequestToBackupId(req *commonwallet.ITeeWalletBackupManagerKeyDataProviderRestore) (pkgbackup.WalletBackupId, error) {
+func backupRequestToBackupId(req *wallet.ITeeWalletBackupManagerKeyDataProviderRestore) (pkgbackup.WalletBackupId, error) {
 	if req.BackupId.RewardEpochId == nil {
 		return pkgbackup.WalletBackupId{}, errors.New("reward epoch not given")
 	}

@@ -3,11 +3,10 @@ package direct
 import (
 	"github.com/pkg/errors"
 
-	"tee-node/internal/processor/direct/getutils"
-	"tee-node/internal/processor/direct/policyutils"
-	"tee-node/pkg/utils"
-
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/processor/direct/getutils"
+	"github.com/flare-foundation/tee-node/internal/processor/direct/policyutils"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 )
 
 func ProcessDirectInstruction(directInstructionData *types.DirectInstructionData) ([]byte, error) {

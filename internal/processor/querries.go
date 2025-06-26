@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"tee-node/internal/settings"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
 func getActionInfo(url string) (*types.ActionInfo, error) {

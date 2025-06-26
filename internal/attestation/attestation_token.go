@@ -8,9 +8,9 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"tee-node/internal/settings"
 
-	"tee-node/pkg/attestation"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/attestation"
 )
 
 func GetGoogleAttestationToken(nonces []string, tokenType attestation.TokenType) ([]byte, error) {

@@ -3,7 +3,8 @@ package backup
 import (
 	"crypto/rand"
 	"math/big"
-	"tee-node/pkg/backup"
+
+	"github.com/flare-foundation/tee-node/pkg/backup"
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/pkg/errors"

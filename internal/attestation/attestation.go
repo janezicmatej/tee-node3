@@ -3,8 +3,8 @@ package attestation
 import (
 	"crypto/x509"
 
-	"tee-node/internal/settings"
-	"tee-node/pkg/attestation"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/attestation"
 
 	"github.com/pkg/errors"
 )

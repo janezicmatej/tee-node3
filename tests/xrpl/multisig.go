@@ -3,12 +3,12 @@ package xrpl
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"tee-node/pkg/utils"
-	xrputils "tee-node/tests/xrpl/utils"
 
-	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/flare-foundation/tee-node/pkg/utils"
+	xrputils "github.com/flare-foundation/tee-node/tests/xrpl/utils"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
 
 func ConstructSignerItem(_account string, txnSignature []byte, pkBytes []byte) (*xrputils.Signer, error) {

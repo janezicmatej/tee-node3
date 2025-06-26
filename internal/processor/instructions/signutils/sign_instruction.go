@@ -2,11 +2,11 @@ package signutils
 
 import (
 	"encoding/json"
-	"tee-node/internal/signing"
-	"tee-node/internal/wallets"
-	"tee-node/pkg/utils"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/signing"
+	"github.com/flare-foundation/tee-node/internal/wallets"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"

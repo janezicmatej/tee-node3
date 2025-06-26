@@ -6,11 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"tee-node/internal/node"
-	"tee-node/internal/policy"
-	"tee-node/internal/testutils"
-
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/testutils"
+	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
 var numVoters int

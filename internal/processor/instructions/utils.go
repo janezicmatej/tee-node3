@@ -3,9 +3,10 @@ package instructions
 import (
 	"slices"
 	"sort"
-	"tee-node/internal/policy"
-	"tee-node/internal/settings"
-	"tee-node/pkg/utils"
+
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"

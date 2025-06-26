@@ -7,16 +7,15 @@ import (
 	"io"
 	"slices"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/types"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/pkg/errors"
-
-	btcecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
 )
 
 func GenerateRandom() ([32]byte, error) {

@@ -2,9 +2,9 @@ package utils_test
 
 import (
 	"encoding/hex"
-
-	xrplutils "tee-node/tests/xrpl/utils"
 	"testing"
+
+	xrplutils "github.com/flare-foundation/tee-node/tests/xrpl/utils"
 
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,5 @@ func TestDeriveAddress(t *testing.T) {
 		pubKey := xrplutils.PublicKey(pkBytes)
 
 		require.Equal(t, addresses[i], pubKey.Address())
-
 	}
-
 }

@@ -3,13 +3,13 @@ package walletutils_test
 import (
 	"crypto/ecdsa"
 	"math/big"
-	"tee-node/internal/node"
-	"tee-node/internal/processor/instructions/walletutils"
-	"tee-node/internal/testutils"
-	"tee-node/pkg/utils"
 	"testing"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/processor/instructions/walletutils"
+	"github.com/flare-foundation/tee-node/internal/testutils"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"

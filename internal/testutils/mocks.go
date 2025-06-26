@@ -6,21 +6,20 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
-	"tee-node/internal/processor/instructions/walletutils"
-	"tee-node/pkg/utils"
 	"testing"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/processor/instructions/walletutils"
+	"github.com/flare-foundation/tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
-	"github.com/stretchr/testify/require"
-
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
+	"github.com/stretchr/testify/require"
 )
 
 func CreateMockWallet(t *testing.T, nodeId common.Address, walletId common.Hash, keyId uint64, rewardEpochId uint32,

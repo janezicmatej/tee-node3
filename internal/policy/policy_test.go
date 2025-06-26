@@ -1,6 +1,6 @@
 package policy_test
 
-// tp "tee-node/client/policy"
+// tp "github.com/flare-foundation/tee-node/client/policy"
 
 // ! Count valid signatures
 

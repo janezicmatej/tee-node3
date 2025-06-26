@@ -4,7 +4,8 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
-	xrputils "tee-node/tests/xrpl/utils"
+
+	xrputils "github.com/flare-foundation/tee-node/tests/xrpl/utils"
 )
 
 // * ==== Constructing, encoding and signing transactions ==== * //
@@ -115,7 +116,6 @@ func GetAccountFromAddress(address string) (*xrputils.Account, error) {
 
 	return &account, nil
 }
-
 
 // Helper function to prepend prefix and append suffix
 func addPrefixAndSuffix(data []byte, prefix []byte, suffix []byte) []byte {

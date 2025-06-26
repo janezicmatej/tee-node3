@@ -4,7 +4,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"slices"
-	"tee-node/pkg/utils"
+
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"

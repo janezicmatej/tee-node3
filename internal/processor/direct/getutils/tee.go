@@ -3,14 +3,14 @@ package getutils
 import (
 	"encoding/hex"
 	"encoding/json"
-	"tee-node/internal/attestation"
-	"tee-node/internal/node"
-	"tee-node/internal/policy"
-	"tee-node/internal/settings"
 	"time"
 
-	commonattestation "tee-node/pkg/attestation"
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/attestation"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	pkgattestation "github.com/flare-foundation/tee-node/pkg/attestation"
+	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
 func GetTeeInfo(getAction *types.DirectInstructionData) ([]byte, error) {
@@ -50,7 +50,7 @@ func GetTeeInfo(getAction *types.DirectInstructionData) ([]byte, error) {
 		return nil, err
 	}
 
-	attestationBytes, err := attestation.GetGoogleAttestationToken([]string{hex.EncodeToString(teeInfoHash[:])}, commonattestation.PKITokenType)
+	attestationBytes, err := attestation.GetGoogleAttestationToken([]string{hex.EncodeToString(teeInfoHash[:])}, pkgattestation.PKITokenType)
 	if err != nil {
 		return nil, err
 	}

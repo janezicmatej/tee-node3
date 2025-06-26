@@ -3,11 +3,11 @@ package getutils
 import (
 	"encoding/json"
 
-	"tee-node/internal/node"
-	"tee-node/internal/policy"
-	"tee-node/internal/wallets"
-	"tee-node/internal/wallets/backup"
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/wallets"
+	"github.com/flare-foundation/tee-node/internal/wallets/backup"
+	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
 // todo: the returned backup should be uniquely identifiable

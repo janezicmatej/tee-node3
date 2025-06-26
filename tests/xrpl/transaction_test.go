@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"tee-node/pkg/utils"
-	"tee-node/tests/xrpl"
-	xrputils "tee-node/tests/xrpl/utils"
+	"github.com/flare-foundation/tee-node/pkg/utils"
+	"github.com/flare-foundation/tee-node/tests/xrpl"
+	xrputils "github.com/flare-foundation/tee-node/tests/xrpl/utils"
 
 	"github.com/ethereum/go-ethereum/crypto"
 )

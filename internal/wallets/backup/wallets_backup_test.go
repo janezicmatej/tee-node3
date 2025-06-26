@@ -2,14 +2,13 @@ package backup
 
 import (
 	"crypto/ecdsa"
-	"tee-node/internal/node"
-	"tee-node/internal/settings"
-	"tee-node/internal/wallets"
-	"tee-node/pkg/utils"
-
 	"testing"
 
-	"tee-node/pkg/backup"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/internal/wallets"
+	"github.com/flare-foundation/tee-node/pkg/backup"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

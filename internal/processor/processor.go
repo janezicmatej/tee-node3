@@ -2,13 +2,13 @@ package processor
 
 import (
 	"encoding/json"
-	"tee-node/internal/node"
-	"tee-node/internal/processor/direct"
-	"tee-node/internal/processor/instructions"
-	"tee-node/internal/settings"
 	"time"
 
-	"tee-node/pkg/types"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/processor/direct"
+	"github.com/flare-foundation/tee-node/internal/processor/instructions"
+	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/types"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/logger"

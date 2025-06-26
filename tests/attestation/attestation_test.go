@@ -2,8 +2,9 @@ package attestation_test
 
 import (
 	"fmt"
-	"tee-node/tests/attestation"
 	"testing"
+
+	"github.com/flare-foundation/tee-node/tests/attestation"
 )
 
 func TestVerifyOIDCToken(t *testing.T) {

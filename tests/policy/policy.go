@@ -6,10 +6,9 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	pd "tee-node/internal/policy"
-	"tee-node/internal/testutils"
-
-	api "tee-node/pkg/types"
+	pd "github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/testutils"
+	"github.com/flare-foundation/tee-node/pkg/types"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -159,8 +158,8 @@ type PolicySignature struct {
 	PubKey []byte
 }
 
-func CreateInitializePolicyAction(policies []*relay.RelaySigningPolicyInitialized, signatures map[common.Hash][]*PolicySignature, pubKeysMap map[common.Address]*ecdsa.PublicKey) (*api.Action, error) {
-	policyRequests := []api.MultiSignedPolicy{}
+func CreateInitializePolicyAction(policies []*relay.RelaySigningPolicyInitialized, signatures map[common.Hash][]*PolicySignature, pubKeysMap map[common.Address]*ecdsa.PublicKey) (*types.Action, error) {
+	policyRequests := []types.MultiSignedPolicy{}
 
 	// Replay policy signing from the second policy onwards
 	for _, policy := range policies[1:] {
@@ -171,7 +170,7 @@ func CreateInitializePolicyAction(policies []*relay.RelaySigningPolicyInitialize
 			return nil, err
 		}
 
-		policySignatureRequests := []*api.SignatureMessage{}
+		policySignatureRequests := []*types.SignatureMessage{}
 		for _, sig := range policySignatures {
 			pubKey, err := crypto.UnmarshalPubkey(sig.PubKey)
 			if err != nil {
@@ -182,15 +181,15 @@ func CreateInitializePolicyAction(policies []*relay.RelaySigningPolicyInitialize
 			if weight == 0 {
 				continue
 			}
-			newPubKey := api.PubKeyToStruct(pubKey)
-			mes := api.SignatureMessage{
+			newPubKey := types.PubKeyToStruct(pubKey)
+			mes := types.SignatureMessage{
 				PublicKey: newPubKey,
 				Signature: sig.Sig,
 			}
 			policySignatureRequests = append(policySignatureRequests, &mes)
 		}
 
-		signNewPolicyRequest := api.MultiSignedPolicy{
+		signNewPolicyRequest := types.MultiSignedPolicy{
 			PolicyBytes: policy.SigningPolicyBytes,
 			Signatures:  policySignatureRequests,
 		}
@@ -198,12 +197,12 @@ func CreateInitializePolicyAction(policies []*relay.RelaySigningPolicyInitialize
 		policyRequests = append(policyRequests, signNewPolicyRequest)
 	}
 
-	pubKeys := make([]api.ECDSAPublicKey, len(policies[len(policies)-1].Voters))
+	pubKeys := make([]types.ECDSAPublicKey, len(policies[len(policies)-1].Voters))
 	for i, voter := range policies[len(policies)-1].Voters {
-		pubKeys[i] = api.PubKeyToStruct(pubKeysMap[voter])
+		pubKeys[i] = types.PubKeyToStruct(pubKeysMap[voter])
 	}
 
-	req := &api.InitializePolicyRequest{
+	req := &types.InitializePolicyRequest{
 		InitialPolicyBytes:     policies[0].SigningPolicyBytes,
 		Policies:               policyRequests,
 		LatestPolicyPublicKeys: pubKeys,

@@ -1,4 +1,4 @@
-module tee-node
+module github.com/flare-foundation/tee-node
 
 go 1.24.4
 

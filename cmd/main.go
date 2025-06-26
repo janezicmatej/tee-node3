@@ -1,10 +1,10 @@
 package main
 
 import (
-	"tee-node/internal/attestation"
-	"tee-node/internal/node"
-	"tee-node/internal/processor"
-	"tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/internal/attestation"
+	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/processor"
+	"github.com/flare-foundation/tee-node/internal/settings"
 
 	"github.com/flare-foundation/go-flare-common/pkg/logger"
 )
