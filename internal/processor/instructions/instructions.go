@@ -5,6 +5,7 @@ import (
 
 	"github.com/flare-foundation/tee-node/internal/node"
 	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/processor/instructions/regutils"
 	"github.com/flare-foundation/tee-node/internal/processor/instructions/signutils"
 	"github.com/flare-foundation/tee-node/internal/processor/instructions/walletutils"
 	"github.com/flare-foundation/tee-node/pkg/types"
@@ -127,26 +128,29 @@ func validateExecuteInstruction(
 }
 
 func regInstruction(instructionData *instruction.DataFixed, submissionTag types.SubmissionTag) ([]byte, error) {
+	var err error
+	var result []byte
+
 	switch submissionTag {
 	case types.ThresholdReachedSubmissionTag:
 		switch utils.OpHashToString(instructionData.OPCommand) {
 		case "TEE_ATTESTATION":
-			return nil, errors.New("REG TEE_ATTESTATION command not implemented yet")
-
+			result, err = regutils.TeeAttestation(instructionData)
 		default:
-			return nil, errors.New("Unknown OpCommand for REG OpType")
+			err = errors.New("Unknown OpCommand for REG OpType")
 		}
 	case types.VotingClosedSubmissionTag:
 		switch utils.OpHashToString(instructionData.OPCommand) {
 		case "TEE_ATTESTATION":
-			return nil, errors.New("REG TEE_ATTESTATION command not implemented yet")
-
+			err = regutils.ValidateTeeAttestation(instructionData)
 		default:
-			return nil, errors.New("Unknown OpCommand for REG OpType")
+			err = errors.New("Unknown OpCommand for REG OpType")
 		}
 	default:
 		return nil, errors.New("unexpected submission tag")
 	}
+
+	return result, err
 }
 
 func walletInstruction(

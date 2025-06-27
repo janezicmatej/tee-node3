@@ -5,6 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
 )
 
 type TeeInfo struct {
@@ -39,4 +42,16 @@ type TeeInfoRequest struct {
 type TeeInfoResponse struct {
 	TeeInfo
 	Attestation []byte
+}
+
+func ParseTeeAttestationRequest(instructionData *instruction.DataFixed) (verification.ITeeVerificationTeeAttestation, error) {
+	arg := verification.MessageArguments[verification.TeeAttestation]
+
+	var unpacked verification.ITeeVerificationTeeAttestation
+	err := structs.DecodeTo(arg, instructionData.OriginalMessage, &unpacked)
+	if err != nil {
+		return verification.ITeeVerificationTeeAttestation{}, err
+	}
+
+	return unpacked, nil
 }
