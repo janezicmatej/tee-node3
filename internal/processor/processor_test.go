@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
 
 	commonwallet "github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/flare-foundation/tee-node/internal/node"
@@ -106,6 +107,9 @@ func TestProcessorEndToEnd(t *testing.T) {
 
 	walletProof.Nonce = nonce
 	require.Equal(t, walletProof, recoveredWalletProof)
+
+	getTeeAttestation(t, mainActionInfoChan, actionMap, actionResponseChan, teeId,
+		providersPrivKeys, finalEpochId, actionId)
 
 	// todo: update policy
 }
@@ -539,6 +543,77 @@ func recoverWallet(t *testing.T, actionInfoChan chan *types.ActionInfo, actionMa
 	require.NoError(t, err)
 
 	return &walletExistenceProof
+}
+
+func getTeeAttestation(t *testing.T, actionInfoChan chan *types.ActionInfo, actionMap map[types.ActionInfo]*types.Action,
+	actionResponseChan chan *types.ActionResponse, teeId common.Address, privKeys []*ecdsa.PrivateKey,
+	rewardEpochId uint32, actionId *big.Int) {
+
+	challenge, err := rand.Int(rand.Reader, new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil))
+	require.NoError(t, err)
+
+	originalMessage := verification.ITeeVerificationTeeAttestation{
+		TeeMachine: verification.ITeeRegistryTeeMachineWithAttestationData{
+			TeeId:        teeId,
+			InitialTeeId: common.Address{},
+			Url:          "bla",
+			CodeHash:     [32]byte{},
+			Platform:     [32]byte{},
+		},
+		Challenge: challenge,
+	}
+	originalMessageEncoded, err := abi.Arguments{verification.MessageArguments[verification.TeeAttestation]}.Pack(originalMessage)
+	require.NoError(t, err)
+
+	// generate action sent when threshold reached
+	action, err := testutils.BuildMockQueuedActionInstruction(
+		"REG", "TEE_ATTESTATION", originalMessageEncoded, privKeys, teeId, rewardEpochId, nil, nil, types.ThresholdReachedSubmissionTag,
+	)
+	require.NoError(t, err)
+
+	actionInfo := &types.ActionInfo{QueueId: "main", ActionId: common.BigToHash(actionId)}
+
+	actionMap[*actionInfo] = action
+	actionInfoChan <- actionInfo
+
+	actionResponse := <-actionResponseChan
+	require.True(t, actionResponse.Result.Status)
+	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.ResultData.Message), actionResponse.Result.ResultData.Signature, teeId)
+	require.NoError(t, err)
+
+	var teeInfoResponse types.TeeInfoResponse
+	err = json.Unmarshal(actionResponse.Result.ResultData.Message, &teeInfoResponse)
+	require.NoError(t, err)
+
+	teePubKey, err := types.ParsePubKey(teeInfoResponse.PublicKey)
+	require.NoError(t, err)
+
+	receivedTeeId := crypto.PubkeyToAddress(*teePubKey)
+
+	require.Equal(t, receivedTeeId, teeId)
+
+	// generate action sent when voting closed
+	action, err = testutils.BuildMockQueuedActionInstruction(
+		"REG", "TEE_ATTESTATION", originalMessageEncoded, privKeys, teeId, rewardEpochId, nil, nil, types.VotingClosedSubmissionTag,
+	)
+	require.NoError(t, err)
+
+	actionInfo = &types.ActionInfo{QueueId: "main", ActionId: common.BigToHash(actionId)}
+
+	actionMap[*actionInfo] = action
+	actionInfoChan <- actionInfo
+
+	actionResponse = <-actionResponseChan
+	require.True(t, actionResponse.Result.Status)
+	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.ResultData.Message), actionResponse.Result.ResultData.Signature, teeId)
+	require.NoError(t, err)
+
+	var signerSequence types.SignerSequence
+	err = json.Unmarshal(actionResponse.Result.ResultData.Message, &signerSequence)
+	require.NoError(t, err)
+
+	err = utils.VerifySignature(signerSequence.Data.VoteHash[:], signerSequence.Signature, teeId)
+	require.NoError(t, err)
 }
 
 func MockProxy(t *testing.T, mainActionInfoChan, readActionInfoChan chan *types.ActionInfo,
