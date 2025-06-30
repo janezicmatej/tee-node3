@@ -563,12 +563,12 @@ func getTeeAttestation(t *testing.T, actionInfoChan chan *types.ActionInfo, acti
 		},
 		Challenge: challenge,
 	}
-	originalMessageEncoded, err := abi.Arguments{verification.MessageArguments[verification.TeeAttestation]}.Pack(originalMessage)
+	originalMessageEncoded, err := abi.Arguments{verification.MessageArguments[constants.TEEAttestation]}.Pack(originalMessage)
 	require.NoError(t, err)
 
 	// generate action sent when threshold reached
 	action, err := testutils.BuildMockQueuedActionInstruction(
-		"REG", "TEE_ATTESTATION", originalMessageEncoded, privKeys, teeId, rewardEpochId, nil, nil, types.ThresholdReachedSubmissionTag,
+		"REG", "TEE_ATTESTATION", originalMessageEncoded, privKeys, teeId, rewardEpochId, nil, nil, types.Threshold,
 	)
 	require.NoError(t, err)
 
@@ -578,7 +578,7 @@ func getTeeAttestation(t *testing.T, actionInfoChan chan *types.ActionInfo, acti
 	actionInfoChan <- actionInfo
 
 	actionResponse := <-actionResponseChan
-	require.True(t, actionResponse.Result.Status)
+	require.True(t, actionResponse.Status)
 	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.ResultData.Message), actionResponse.Result.ResultData.Signature, teeId)
 	require.NoError(t, err)
 
@@ -595,7 +595,7 @@ func getTeeAttestation(t *testing.T, actionInfoChan chan *types.ActionInfo, acti
 
 	// generate action sent when voting closed
 	action, err = testutils.BuildMockQueuedActionInstruction(
-		"REG", "TEE_ATTESTATION", originalMessageEncoded, privKeys, teeId, rewardEpochId, nil, nil, types.VotingClosedSubmissionTag,
+		"REG", "TEE_ATTESTATION", originalMessageEncoded, privKeys, teeId, rewardEpochId, nil, nil, types.End,
 	)
 	require.NoError(t, err)
 
@@ -605,7 +605,7 @@ func getTeeAttestation(t *testing.T, actionInfoChan chan *types.ActionInfo, acti
 	actionInfoChan <- actionInfo
 
 	actionResponse = <-actionResponseChan
-	require.True(t, actionResponse.Result.Status)
+	require.True(t, actionResponse.Status)
 	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.ResultData.Message), actionResponse.Result.ResultData.Signature, teeId)
 	require.NoError(t, err)
 
