@@ -343,7 +343,7 @@ func processKeySplitMessage(keySplitMessage []byte, walletBackupId pkgbackup.Wal
 }
 
 func checkSigners(signers []common.Address, expectedProviders []common.Address, expectedAdmins []types.ECDSAPublicKey, adminThreshold uint64) ([]bool, error) {
-	adminsAddresses := make(map[common.Address]bool)
+	adminAddresses := make(map[common.Address]bool)
 	countAdmins := uint64(0)
 	for _, admin := range expectedAdmins {
 		adminPubKey, err := types.ParsePubKey(admin)
@@ -351,7 +351,7 @@ func checkSigners(signers []common.Address, expectedProviders []common.Address, 
 			return nil, err
 		}
 		adminAddress := crypto.PubkeyToAddress(*adminPubKey)
-		adminsAddresses[adminAddress] = true
+		adminAddresses[adminAddress] = true
 		if slices.Contains(signers, adminAddress) {
 			countAdmins++
 		}
@@ -364,7 +364,7 @@ func checkSigners(signers []common.Address, expectedProviders []common.Address, 
 	isProviderAndAdmin := make([]bool, len(signers))
 	for i, signer := range signers {
 		isProvider := slices.Contains(expectedProviders, signer)
-		_, isAdmin := adminsAddresses[signer]
+		_, isAdmin := adminAddresses[signer]
 		if isProvider && isAdmin {
 			isProviderAndAdmin[i] = true
 		}

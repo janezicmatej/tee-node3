@@ -42,12 +42,12 @@ func TestBackupAndRecover(t *testing.T) {
 	providerKey2, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 
-	providersPubKeys := []*ecdsa.PublicKey{&providerKey1.PublicKey, &providerKey2.PublicKey}
+	providerPubKeys := []*ecdsa.PublicKey{&providerKey1.PublicKey, &providerKey2.PublicKey}
 	weights := []uint16{7, 20}
 	settings.NormalizationConstant = 27
 	settings.DataProvidersBackupThreshold = uint64(22)
 
-	adminsPubKeys := []*ecdsa.PublicKey{&adminKey1.PublicKey, &adminKey2.PublicKey, &adminKey3.PublicKey}
+	adminPubKeys := []*ecdsa.PublicKey{&adminKey1.PublicKey, &adminKey2.PublicKey, &adminKey3.PublicKey}
 	adminsThreshold := uint64(2)
 
 	givenWallet := &wallets.Wallet{
@@ -58,7 +58,7 @@ func TestBackupAndRecover(t *testing.T) {
 		XrpAddress: xrpAddress,
 		Restored:   false,
 
-		AdminsPublicKeys:   adminsPubKeys,
+		AdminPublicKeys:    adminPubKeys,
 		AdminsThreshold:    adminsThreshold,
 		Cosigners:          []common.Address{common.HexToAddress("aa")},
 		CosignersThreshold: 1,
@@ -71,7 +71,7 @@ func TestBackupAndRecover(t *testing.T) {
 	rewardEpochId := uint32(100)
 
 	// Backup the wallet
-	walletBackup, err := BackupWallet(givenWallet, providersPubKeys, weights, rewardEpochId, node.GetTeeId())
+	walletBackup, err := BackupWallet(givenWallet, providerPubKeys, weights, rewardEpochId, node.GetTeeId())
 	assert.NoError(t, err)
 	assert.NotNil(t, walletBackup)
 	err = walletBackup.Check()
@@ -82,17 +82,17 @@ func TestBackupAndRecover(t *testing.T) {
 	assert.NoError(t, err)
 	adminShare2, err := backup.DecryptSplit(walletBackup.AdminEncryptedParts.Splits[1], adminKey2)
 	assert.NoError(t, err)
-	providerShare1, err := backup.DecryptSplit(walletBackup.ProvidersEncryptedParts.Splits[0], providerKey1)
+	providerShare1, err := backup.DecryptSplit(walletBackup.ProviderEncryptedParts.Splits[0], providerKey1)
 	assert.NoError(t, err)
-	providerShare2, err := backup.DecryptSplit(walletBackup.ProvidersEncryptedParts.Splits[1], providerKey2)
+	providerShare2, err := backup.DecryptSplit(walletBackup.ProviderEncryptedParts.Splits[1], providerKey2)
 	assert.NoError(t, err)
 
-	adminsKeyShares := []*backup.KeySplit{adminShare1, adminShare2}
-	providersKeyShares := []*backup.KeySplit{providerShare1, providerShare2}
+	adminKeyShares := []*backup.KeySplit{adminShare1, adminShare2}
+	providerKeyShares := []*backup.KeySplit{providerShare1, providerShare2}
 
 	// Recover the wallet
 	recoveredWallet, err := RecoverWallet(
-		append(adminsKeyShares, providersKeyShares...),
+		append(adminKeyShares, providerKeyShares...),
 		&walletBackup.WalletBackupMetaData,
 	)
 	assert.NoError(t, err)

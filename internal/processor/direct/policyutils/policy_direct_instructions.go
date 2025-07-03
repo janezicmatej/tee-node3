@@ -127,7 +127,7 @@ func processUpdatePolicyRequest(policyRequest types.MultiSignedPolicy) (*policy.
 		signers[i] = providerAddress
 	}
 
-	if policy.WeightOfSigners(signers, activeSigningPolicy) < activeSigningPolicy.Threshold {
+	if policy.WeightOfSigners(signers, activeSigningPolicy) <= activeSigningPolicy.Threshold {
 		return nil, errors.New("threshold for updating policy not reached")
 	}
 

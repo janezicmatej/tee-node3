@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/constants"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/connector"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
 
@@ -44,25 +45,25 @@ func TestProcessorEndToEnd(t *testing.T) {
 	numVoters, numPolicies, startingEpochId := 100, 10, uint32(1)
 	finalEpochId := startingEpochId + uint32(numPolicies)
 
-	providersAddresses, providersPrivKeys, _ := testutils.GenerateRandomKeys(numVoters)
+	providerAddresses, providerPrivKeys, _ := testutils.GenerateRandomKeys(numVoters)
 
 	numAdmins := 3
-	adminsPubKeys := make([]*ecdsa.PublicKey, numAdmins)
-	adminsPrivKeys := make([]*ecdsa.PrivateKey, numAdmins)
+	adminPubKeys := make([]*ecdsa.PublicKey, numAdmins)
+	adminPrivKeys := make([]*ecdsa.PrivateKey, numAdmins)
 	for i := range numAdmins - 1 {
-		adminsPrivKeys[i], err = crypto.GenerateKey()
+		adminPrivKeys[i], err = crypto.GenerateKey()
 		require.NoError(t, err)
-		adminsPubKeys[i] = &adminsPrivKeys[i].PublicKey
+		adminPubKeys[i] = &adminPrivKeys[i].PublicKey
 	}
 
 	// make one provider also admin
-	adminsPrivKeys[numAdmins-1] = providersPrivKeys[0]
-	adminsPubKeys[numAdmins-1] = &providersPrivKeys[0].PublicKey
+	adminPrivKeys[numAdmins-1] = providerPrivKeys[0]
+	adminPubKeys[numAdmins-1] = &providerPrivKeys[0].PublicKey
 
 	// change type
-	adminsWalletPublicKeys := make([]commonwallet.PublicKey, len(adminsPubKeys))
-	for i, pubKey := range adminsPubKeys {
-		adminsWalletPublicKeys[i] = commonwallet.PublicKey(types.PubKeyToStruct(pubKey))
+	adminWalletPublicKeys := make([]commonwallet.PublicKey, len(adminPubKeys))
+	for i, pubKey := range adminPubKeys {
+		adminWalletPublicKeys[i] = commonwallet.PublicKey(types.PubKeyToStruct(pubKey))
 	}
 
 	mainActionInfoChan := make(chan *types.ActionInfo, 100)
@@ -76,7 +77,7 @@ func TestProcessorEndToEnd(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	actionId := big.NewInt(0)
-	initializePolicy(t, mainActionInfoChan, actionMap, actionResponseChan, providersPrivKeys, providersAddresses,
+	initializePolicy(t, mainActionInfoChan, actionMap, actionResponseChan, providerPrivKeys, providerAddresses,
 		actionId, numPolicies, startingEpochId)
 
 	teeId, teePubKey := getTeeInfo(t, readActionInfoChan, actionMap, actionResponseChan, actionId)
@@ -85,24 +86,24 @@ func TestProcessorEndToEnd(t *testing.T) {
 	var walletId = common.HexToHash("0xabcdef")
 	var keyId = uint64(1)
 	walletProof := generateWallet(t, mainActionInfoChan, actionMap, actionResponseChan, teeId, walletId, keyId,
-		providersPrivKeys, adminsWalletPublicKeys, finalEpochId, actionId)
+		providerPrivKeys, adminWalletPublicKeys, finalEpochId, actionId)
 	require.Equal(t, walletProof.Restored, false)
 	actionId.Add(actionId, common.Big1)
 
 	paymentHash := "560ccd6e79ba7166e82dbf2a5b9a52283a509b63c39d4a4cc7164db3e43484c4"
-	signTransaction(t, mainActionInfoChan, actionMap, actionResponseChan, teeId, walletId, keyId, providersPrivKeys, finalEpochId, actionId, paymentHash)
+	signTransaction(t, mainActionInfoChan, actionMap, actionResponseChan, teeId, walletId, keyId, providerPrivKeys, finalEpochId, actionId, paymentHash)
 	actionId.Add(actionId, common.Big1)
 
 	walletBackup := getBackup(t, readActionInfoChan, actionMap, actionResponseChan, teeId, walletId, keyId, actionId)
 	actionId.Add(actionId, common.Big1)
 
 	nonce := big.NewInt(1)
-	deleteWallet(t, mainActionInfoChan, actionMap, actionResponseChan, teeId, walletId, keyId, providersPrivKeys, finalEpochId, actionId, nonce)
+	deleteWallet(t, mainActionInfoChan, actionMap, actionResponseChan, teeId, walletId, keyId, providerPrivKeys, finalEpochId, actionId, nonce)
 	actionId.Add(actionId, common.Big1)
 	nonce.Add(actionId, common.Big1)
 
 	recoveredWalletProof := recoverWallet(t, mainActionInfoChan, actionMap, actionResponseChan, teeId, teePubKey, walletId, keyId,
-		providersPrivKeys, adminsPrivKeys, finalEpochId, actionId, nonce, walletBackup)
+		providerPrivKeys, adminPrivKeys, finalEpochId, actionId, nonce, walletBackup)
 	walletProof.Restored = true
 	actionId.Add(actionId, common.Big1)
 
@@ -110,7 +111,11 @@ func TestProcessorEndToEnd(t *testing.T) {
 	require.Equal(t, walletProof, recoveredWalletProof)
 
 	getTeeAttestation(t, mainActionInfoChan, actionMap, actionResponseChan, teeId,
-		providersPrivKeys, finalEpochId, actionId)
+		providerPrivKeys, finalEpochId, actionId)
+	actionId.Add(actionId, common.Big1)
+
+	fdcProve(t, mainActionInfoChan, actionMap, actionResponseChan, teeId, providerPrivKeys, adminPrivKeys, finalEpochId, actionId)
+	actionId.Add(actionId, common.Big1)
 
 	// todo: update policy
 }
@@ -183,7 +188,7 @@ func getTeeInfo(t *testing.T, actionInfoChan chan *types.ActionInfo, actionMap m
 
 func generateWallet(t *testing.T, actionInfoChan chan *types.ActionInfo, actionMap map[types.ActionInfo]*types.Action,
 	actionResponseChan chan *types.ActionResponse, teeId common.Address, walletId [32]byte, keyId uint64, privKeys []*ecdsa.PrivateKey,
-	adminsWalletPublicKeys []commonwallet.PublicKey, rewardEpochId uint32, actionId *big.Int) *commonwallet.ITeeWalletKeyManagerKeyExistence {
+	adminWalletPublicKeys []commonwallet.PublicKey, rewardEpochId uint32, actionId *big.Int) *commonwallet.ITeeWalletKeyManagerKeyExistence {
 	originalMessage := commonwallet.ITeeWalletKeyManagerKeyGenerate{
 		TeeId:    teeId,
 		WalletId: walletId,
@@ -191,8 +196,8 @@ func generateWallet(t *testing.T, actionInfoChan chan *types.ActionInfo, actionM
 		OpType:   utils.StringToOpHash("WALLET"),
 		ConfigConstants: commonwallet.ITeeWalletKeyManagerKeyConfigConstants{
 			OpTypeConstants:    make([]byte, 0),
-			AdminsPublicKeys:   adminsWalletPublicKeys,
-			AdminsThreshold:    uint64(len(adminsWalletPublicKeys)),
+			AdminsPublicKeys:   adminWalletPublicKeys,
+			AdminsThreshold:    uint64(len(adminWalletPublicKeys)),
 			Cosigners:          make([]common.Address, 0), // todo: add cosigners
 			CosignersThreshold: 0,
 		},
@@ -433,10 +438,10 @@ func recoverWallet(t *testing.T, actionInfoChan chan *types.ActionInfo, actionMa
 	additionalFixedMessage := walletBackup.WalletBackupMetaData
 
 	adminAndProvider := make(map[common.Address]int)
-	for j, privKey1 := range adminsPrivKeys {
-		address := crypto.PubkeyToAddress(privKey1.PublicKey)
-		for _, privKey2 := range providersPrivKeys {
-			if address == crypto.PubkeyToAddress(privKey2.PublicKey) {
+	for j, adminPrivKey := range adminsPrivKeys {
+		address := crypto.PubkeyToAddress(adminPrivKey.PublicKey)
+		for _, providerPrivKey := range providersPrivKeys {
+			if address == crypto.PubkeyToAddress(providerPrivKey.PublicKey) {
 				adminAndProvider[address] = j
 			}
 		}
@@ -446,7 +451,7 @@ func recoverWallet(t *testing.T, actionInfoChan chan *types.ActionInfo, actionMa
 	additionalVariableMessages := make([]interface{}, 0)
 	privKeys := make([]*ecdsa.PrivateKey, 0)
 	for i, privKey := range providersPrivKeys {
-		keySplit, err := backup.DecryptSplit(walletBackup.ProvidersEncryptedParts.Splits[i], privKey)
+		keySplit, err := backup.DecryptSplit(walletBackup.ProviderEncryptedParts.Splits[i], privKey)
 		require.NoError(t, err)
 
 		address := crypto.PubkeyToAddress(privKey.PublicKey)
@@ -596,6 +601,118 @@ func getTeeAttestation(t *testing.T, actionInfoChan chan *types.ActionInfo, acti
 	// generate action sent when voting closed
 	action, err = testutils.BuildMockQueuedActionInstruction(
 		"REG", "TEE_ATTESTATION", originalMessageEncoded, privKeys, teeId, rewardEpochId, nil, nil, types.End,
+	)
+	require.NoError(t, err)
+
+	actionInfo = &types.ActionInfo{QueueId: "main", ActionId: common.BigToHash(actionId)}
+
+	actionMap[*actionInfo] = action
+	actionInfoChan <- actionInfo
+
+	actionResponse = <-actionResponseChan
+	require.True(t, actionResponse.Status)
+	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.ResultData.Message), actionResponse.Result.ResultData.Signature, teeId)
+	require.NoError(t, err)
+
+	var signerSequence types.SignerSequence
+	err = json.Unmarshal(actionResponse.Result.ResultData.Message, &signerSequence)
+	require.NoError(t, err)
+
+	err = utils.VerifySignature(signerSequence.Data.VoteHash[:], signerSequence.Signature, teeId)
+	require.NoError(t, err)
+}
+
+func fdcProve(t *testing.T, actionInfoChan chan *types.ActionInfo,
+	actionMap map[types.ActionInfo]*types.Action, actionResponseChan chan *types.ActionResponse,
+	teeId common.Address, providerPrivKeys []*ecdsa.PrivateKey, cosignerPrivKeys []*ecdsa.PrivateKey,
+	rewardEpochId uint32, actionId *big.Int) {
+
+	cosignerAddresses := make([]common.Address, len(cosignerPrivKeys))
+	cosignerAndProvider := make(map[common.Address]bool)
+	for j, cosignerPrivKey := range cosignerPrivKeys {
+		cosignerAddresses[j] = utils.PubkeyToAddress(&cosignerPrivKey.PublicKey)
+		for _, providerPrivKey := range providerPrivKeys {
+			if cosignerAddresses[j] == crypto.PubkeyToAddress(providerPrivKey.PublicKey) {
+				cosignerAndProvider[cosignerAddresses[j]] = true
+			}
+		}
+	}
+
+	originalMessage := connector.IFtdcHubFtdcProve{
+		TeeIds:             []common.Address{teeId},
+		ThresholdBIPS:      uint16(testutils.TotalWeight * 0.6),
+		Cosigners:          cosignerAddresses,
+		CosignersThreshold: uint64(len(cosignerAddresses)),
+		AttestationRequest: make([]byte, 10),
+	}
+
+	originalMessageEncoded, err := abi.Arguments{connector.MessageArguments[constants.Prove]}.Pack(originalMessage)
+	require.NoError(t, err)
+
+	additionalFixedMessage := connector.ITeeAvailabilityCheckResponse{
+		ThresholdBIPS:      originalMessage.ThresholdBIPS,
+		Timestamp:          uint64(time.Now().Unix()),
+		Cosigners:          cosignerAddresses,
+		CosignersThreshold: originalMessage.CosignersThreshold,
+		RequestBody: connector.ITeeAvailabilityCheckRequestBody{
+			TeeId:     teeId,
+			Url:       "blabla",
+			Challenge: common.Big1,
+		},
+		ResponseBody: connector.ITeeAvailabilityCheckResponseBody{
+			RewardEpochId: common.Big1,
+		},
+	}
+
+	additionalFixedMessageEncoded, err := abi.Arguments{connector.AttestationTypeArguments[connector.AvailabilityCheck].Response}.Pack(additionalFixedMessage)
+	require.NoError(t, err)
+	additionalFixedMessageHash := crypto.Keccak256(additionalFixedMessageEncoded)
+
+	variableMessages := make([]interface{}, 0)
+	privKeys := make([]*ecdsa.PrivateKey, 0)
+	for _, privKey := range providerPrivKeys {
+		variableMessage, err := utils.Sign(additionalFixedMessageHash[:], privKey)
+		require.NoError(t, err)
+
+		variableMessages = append(variableMessages, variableMessage)
+		privKeys = append(privKeys, privKey)
+	}
+	for _, privKey := range cosignerPrivKeys {
+		if _, check := cosignerAndProvider[utils.PubkeyToAddress(&privKey.PublicKey)]; check {
+			continue
+		}
+		variableMessage, err := utils.Sign(additionalFixedMessageHash[:], privKey)
+		require.NoError(t, err)
+
+		variableMessages = append(variableMessages, variableMessage)
+		privKeys = append(privKeys, privKey)
+	}
+
+	action, err := testutils.BuildMockQueuedActionInstruction(
+		"FDC", "PROVE", originalMessageEncoded, privKeys, teeId, rewardEpochId, additionalFixedMessageEncoded, variableMessages, types.Threshold,
+	)
+	require.NoError(t, err)
+
+	actionInfo := &types.ActionInfo{QueueId: "main", ActionId: common.BigToHash(actionId)}
+
+	actionMap[*actionInfo] = action
+	actionInfoChan <- actionInfo
+
+	actionResponse := <-actionResponseChan
+	require.True(t, actionResponse.Status)
+	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.ResultData.Message), actionResponse.Result.ResultData.Signature, teeId)
+	require.NoError(t, err)
+
+	var fdcResponse types.FdcProveResponse
+	err = json.Unmarshal(actionResponse.Result.ResultData.Message, &fdcResponse)
+	require.NoError(t, err)
+
+	// todo: check result
+	fmt.Println("fdc", fdcResponse.CosignerSignatures)
+
+	// generate action sent when voting closed
+	action, err = testutils.BuildMockQueuedActionInstruction(
+		"FDC", "PROVE", originalMessageEncoded, privKeys, teeId, rewardEpochId, additionalFixedMessageEncoded, variableMessages, types.End,
 	)
 	require.NoError(t, err)
 

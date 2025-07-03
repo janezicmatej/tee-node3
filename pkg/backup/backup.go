@@ -16,9 +16,9 @@ import (
 
 type WalletBackup struct {
 	WalletBackupMetaData
-	AdminEncryptedParts     *EncryptedShares
-	ProvidersEncryptedParts *EncryptedShares
-	Signature               []byte
+	AdminEncryptedParts    *EncryptedShares
+	ProviderEncryptedParts *EncryptedShares
+	Signature              []byte
 }
 
 type WalletBackupMetaData struct {
@@ -129,13 +129,13 @@ func (walletBackup *WalletBackup) HashForSigning() (common.Hash, error) {
 	type WalletBackupForHashing struct {
 		WalletBackupMetaData
 		AdminEncryptedParts     *EncryptedShares
-		ProvidersEncryptedParts *EncryptedShares
+		ProviderEncryptedParts *EncryptedShares
 	}
 
 	walletBackupBytes, err := json.Marshal(WalletBackupForHashing{
 		WalletBackupMetaData:    walletBackup.WalletBackupMetaData,
 		AdminEncryptedParts:     walletBackup.AdminEncryptedParts,
-		ProvidersEncryptedParts: walletBackup.ProvidersEncryptedParts,
+		ProviderEncryptedParts: walletBackup.ProviderEncryptedParts,
 	})
 	if err != nil {
 		return common.Hash{}, err
@@ -150,7 +150,7 @@ func (walletBackup *WalletBackup) Check() error {
 	if err != nil {
 		return err
 	}
-	err = walletBackup.ProvidersEncryptedParts.Check()
+	err = walletBackup.ProviderEncryptedParts.Check()
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func (walletBackup *WalletBackup) Check() error {
 		return errors.New("admin threshold not matching given data")
 	}
 
-	if walletBackup.ProvidersThreshold != walletBackup.ProvidersEncryptedParts.Threshold {
+	if walletBackup.ProvidersThreshold != walletBackup.ProviderEncryptedParts.Threshold {
 		return errors.New("providers threshold not matching given data")
 	}
 

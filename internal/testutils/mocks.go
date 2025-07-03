@@ -101,10 +101,19 @@ func BuildMockQueuedActionInstruction(opType string, opCommand string, originalM
 	additionalFixedMessageRaw interface{}, variableMessages []interface{},
 	submissionTag types.SubmissionTag,
 ) (*types.Action, error) {
-	instructionId, _ := GenerateRandomBytes(32)
-	additionalFixedMessage, err := json.Marshal(additionalFixedMessageRaw)
+	instructionId, err := GenerateRandomBytes(32)
 	if err != nil {
 		return nil, err
+	}
+	var additionalFixedMessage []byte
+	switch additionalFixedMessageRaw := additionalFixedMessageRaw.(type) {
+	case []byte:
+		additionalFixedMessage = additionalFixedMessageRaw
+	default:
+		additionalFixedMessage, err = json.Marshal(additionalFixedMessageRaw)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	instructionDataFixed := instruction.DataFixed{

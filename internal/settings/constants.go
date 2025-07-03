@@ -18,6 +18,9 @@ var InitialPolicyCheck = false
 var InitialPolicyHash = common.HexToHash("6c5d823aa3ecf8e2a00f7bad8b03d6e4557de9ac7be7c5d8408047f5a31f4fd1")
 var InitialPolicyId = uint32(1)
 
+const BIPSConstant = 10000
+const FdcMinimumDataProvidersThreshold = float64(0.4)
+
 // var InitialPolicyBytesHex = "" // TODO: Add the initial policy bytes here as a hex string
 
 // Processor configuration
