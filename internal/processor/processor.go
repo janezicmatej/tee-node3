@@ -25,6 +25,7 @@ func RunTeeProcessor(proxyUrl string) {
 }
 
 func runQueueProcessing(proxyUrl string, queueId string) {
+	// todo: everything is ready for processing actions in parallel, should we?
 	for {
 		var action *types.Action
 		var result *types.Result
@@ -109,18 +110,18 @@ func processAction(action *types.Action) (*types.Result, error) {
 		response.ResultData = types.ActionResultData{Message: message}
 
 	case types.Direct:
-		getData, err := parse[types.DirectInstructionData](action.Data.Message)
+		directInstructionData, err := parse[types.DirectInstructionData](action.Data.Message)
 		if err != nil {
 			return response, err
 		}
 
-		message, err := direct.ProcessDirectInstruction(getData)
+		message, err := direct.ProcessDirectInstruction(directInstructionData)
 		if err != nil {
 			return response, err
 		}
 
-		response.OPCommand = getData.OPCommand
-		response.OPType = getData.OPType
+		response.OPCommand = directInstructionData.OPCommand
+		response.OPType = directInstructionData.OPType
 		response.ResultData = types.ActionResultData{Message: message}
 
 	default:

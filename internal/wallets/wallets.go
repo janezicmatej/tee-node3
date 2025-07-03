@@ -22,7 +22,7 @@ type Wallet struct {
 	XrpAddress string
 	Restored   bool
 
-	AdminsPublicKeys   []*ecdsa.PublicKey
+	AdminPublicKeys    []*ecdsa.PublicKey
 	AdminsThreshold    uint64
 	Cosigners          []common.Address
 	CosignersThreshold uint64
@@ -69,7 +69,7 @@ func CreateNewWallet(walletInfo wallet.ITeeWalletKeyManagerKeyGenerate) (*Wallet
 		PrivateKey:         sk,
 		Address:            crypto.PubkeyToAddress(sk.PublicKey),
 		XrpAddress:         xrpAddress,
-		AdminsPublicKeys:   adminsPubKeys,
+		AdminPublicKeys:    adminsPubKeys,
 		AdminsThreshold:    walletInfo.ConfigConstants.AdminsThreshold,
 		Cosigners:          walletInfo.ConfigConstants.Cosigners,
 		CosignersThreshold: walletInfo.ConfigConstants.CosignersThreshold,
@@ -90,7 +90,7 @@ func CopyWallet(inputWallet *Wallet) *Wallet {
 		XrpAddress: inputWallet.XrpAddress,
 		Restored:   inputWallet.Restored,
 
-		AdminsPublicKeys:   make([]*ecdsa.PublicKey, len(inputWallet.AdminsPublicKeys)),
+		AdminPublicKeys:    make([]*ecdsa.PublicKey, len(inputWallet.AdminPublicKeys)),
 		AdminsThreshold:    inputWallet.AdminsThreshold,
 		Cosigners:          make([]common.Address, len(inputWallet.Cosigners)),
 		CosignersThreshold: inputWallet.CosignersThreshold,
@@ -103,7 +103,7 @@ func CopyWallet(inputWallet *Wallet) *Wallet {
 			PausingNonce: inputWallet.Status.PausingNonce,
 		},
 	}
-	copy(walletCopy.AdminsPublicKeys, inputWallet.AdminsPublicKeys)
+	copy(walletCopy.AdminPublicKeys, inputWallet.AdminPublicKeys)
 	copy(walletCopy.Cosigners, inputWallet.Cosigners)
 	copy(walletCopy.OpTypeConstants, inputWallet.OpTypeConstants)
 
@@ -111,8 +111,8 @@ func CopyWallet(inputWallet *Wallet) *Wallet {
 }
 
 func WalletToKeyExistenceProof(inputWallet *Wallet, teeId common.Address) *wallet.ITeeWalletKeyManagerKeyExistence {
-	adminPubKeys := make([]wallet.PublicKey, len(inputWallet.AdminsPublicKeys))
-	for i, pubKey := range inputWallet.AdminsPublicKeys {
+	adminPubKeys := make([]wallet.PublicKey, len(inputWallet.AdminPublicKeys))
+	for i, pubKey := range inputWallet.AdminPublicKeys {
 		adminPubKeys[i] = wallet.PublicKey(types.PubKeyToStruct(pubKey))
 	}
 

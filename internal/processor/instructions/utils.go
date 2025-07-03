@@ -6,6 +6,7 @@ import (
 
 	"github.com/flare-foundation/tee-node/internal/policy"
 	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -85,21 +86,48 @@ type OPTypeCommand struct {
 
 func checkDataProvidersThreshold(instructionDataFixed *instruction.DataFixed, signers []common.Address, signingPolicy *policy.SigningPolicy) (bool, []bool, error) {
 	oPTypeCommand := OPTypeCommand{utils.OpHashToString(instructionDataFixed.OPType), utils.OpHashToString(instructionDataFixed.OPCommand)}
+	var threshold uint16
+	isDataProvider := make([]bool, len(signers))
+	for i, signer := range signers {
+		if slices.Contains(signingPolicy.Voters, signer) {
+			isDataProvider[i] = true
+		}
+	}
+
 	switch oPTypeCommand {
 	case OPTypeCommand{"WALLET", "KEY_DATA_PROVIDER_RESTORE"}:
-		return true, nil, nil // todo: or add threshold?
-	default:
-		isDataProvider := make([]bool, len(signers))
-		for i, signer := range signers {
-			if slices.Contains(signingPolicy.Voters, signer) {
-				isDataProvider[i] = true
+		return true, isDataProvider, nil
+
+	case OPTypeCommand{"FDC", "PROVE"}:
+		fdcProveRequest, err := types.ParseFDCProve(instructionDataFixed)
+		if err != nil {
+			return false, nil, err
+		}
+		totalWeight := policy.WeightOfSigners(signingPolicy.Voters, signingPolicy)
+
+		if fdcProveRequest.ThresholdBIPS == 0 {
+			threshold = signingPolicy.Threshold
+		} else {
+			threshold = (fdcProveRequest.ThresholdBIPS * totalWeight) / settings.BIPSConstant
+			if (fdcProveRequest.ThresholdBIPS*totalWeight)%settings.BIPSConstant > 0 {
+				threshold++
 			}
 		}
 
-		weight := policy.WeightOfSigners(signers, signingPolicy)
+		if float64(fdcProveRequest.ThresholdBIPS) < float64(settings.BIPSConstant)*settings.FdcMinimumDataProvidersThreshold {
+			return false, nil, errors.New("data providers threshold too low")
+		}
+		if float64(fdcProveRequest.ThresholdBIPS) < float64(settings.BIPSConstant)*0.5 && fdcProveRequest.CosignersThreshold*2 <= uint64(len(fdcProveRequest.Cosigners)) {
+			return false, nil, errors.New("one threshold should be above 50%")
+		}
 
-		return weight >= signingPolicy.Threshold, isDataProvider, nil
+	default:
+		threshold = signingPolicy.Threshold
 	}
+
+	weight := policy.WeightOfSigners(signers, signingPolicy)
+
+	return weight > threshold, isDataProvider, nil
 }
 
 func voteHash(instructionDataFixed *instruction.DataFixed, signatures, variableMessages []hexutil.Bytes, signers []common.Address, timestamps []uint64) (common.Hash, error) {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/flare-foundation/tee-node/internal/node"
 	"github.com/flare-foundation/tee-node/internal/policy"
+	"github.com/flare-foundation/tee-node/internal/processor/instructions/fdcutils"
 	"github.com/flare-foundation/tee-node/internal/processor/instructions/regutils"
 	"github.com/flare-foundation/tee-node/internal/processor/instructions/signutils"
 	"github.com/flare-foundation/tee-node/internal/processor/instructions/walletutils"
@@ -45,7 +46,7 @@ func ProcessInstruction(
 		return nil, nil, errors.New("threshold not reached")
 	}
 
-	executionResult, resultStatus, err := validateExecuteInstruction(instructionData, variableMessages, signers, isSignerDataProvider, submissionTag)
+	executionResult, resultStatus, err := validateOrExecuteInstruction(instructionData, variableMessages, signers, isSignerDataProvider, submissionTag)
 	if err != nil {
 		return nil, resultStatus, err
 	}
@@ -97,7 +98,7 @@ func ProcessInstruction(
 }
 
 // Call forwards the call to the appropriate service and method
-func validateExecuteInstruction(
+func validateOrExecuteInstruction(
 	instructionMessage *instruction.DataFixed,
 	variableMessages []hexutil.Bytes,
 	signers []common.Address,
@@ -119,7 +120,7 @@ func validateExecuteInstruction(
 		result, err = xrpInstruction(instructionMessage, signers, isSignerDataProvider, submissionTag)
 
 	case "FDC":
-		result, err = fdcInstruction(instructionMessage, submissionTag)
+		result, err = fdcInstruction(instructionMessage, variableMessages, signers, isSignerDataProvider, submissionTag)
 
 	default:
 		err = errors.New("invalid operation type")
@@ -231,27 +232,32 @@ func xrpInstruction(instructionData *instruction.DataFixed, signers []common.Add
 	return result, err
 }
 
-func fdcInstruction(instructionData *instruction.DataFixed, submissionTag types.SubmissionTag) ([]byte, error) {
+func fdcInstruction(instructionData *instruction.DataFixed, variableMessages []hexutil.Bytes, signers []common.Address, isSignerDataProvider []bool, submissionTag types.SubmissionTag) ([]byte, error) {
+	var err error
+	var result []byte
+
 	switch submissionTag {
 	case types.Threshold:
 		switch utils.OpHashToString(instructionData.OPCommand) {
 		case "PROVE":
-			return nil, errors.New("FDC PROVE command not implemented yet")
+			result, err = fdcutils.ValidateFdcProve(instructionData, variableMessages, signers, isSignerDataProvider)
 
 		default:
-			return nil, errors.New("Unknown OpCommand for FDC OpType")
+			err = errors.New("Unknown OpCommand for FDC OpType")
 		}
 	case types.End:
 		switch utils.OpHashToString(instructionData.OPCommand) {
 		case "PROVE":
-			return nil, errors.New("FDC PROVE command not implemented yet")
+			_, err = fdcutils.ValidateFdcProve(instructionData, variableMessages, signers, isSignerDataProvider)
 
 		default:
-			return nil, errors.New("Unknown OpCommand for FDC OpType")
+			err = errors.New("Unknown OpCommand for FDC OpType")
 		}
 	default:
-		return nil, errors.New("unexpected submission tag")
+		err = errors.New("unexpected submission tag")
 	}
+
+	return result, err
 }
 
 func checkInstructionData(instructionData *instruction.DataFixed) (*policy.SigningPolicy, error) {

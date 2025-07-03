@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
-	"github.com/pkg/errors"
 )
 
 func SignPaymentTransaction(instructionData *instruction.DataFixed, signers []common.Address, isSignerDataProvider []bool) ([]byte, error) {
@@ -34,12 +33,9 @@ func SignPaymentTransaction(instructionData *instruction.DataFixed, signers []co
 		return nil, err
 	}
 
-	check, err := signing.CheckCosigners(signers, isSignerDataProvider, signingWallet.Cosigners, signingWallet.CosignersThreshold)
+	_, err = utils.CheckCosigners(signers, isSignerDataProvider, signingWallet.Cosigners, signingWallet.CosignersThreshold)
 	if err != nil {
 		return nil, err
-	}
-	if !check {
-		return nil, errors.New("cosigners threshold not reached")
 	}
 
 	txnSignature, err := signing.SignXrpPayment(additionalFixedMessage.PaymentHash, signingWallet.PrivateKey)

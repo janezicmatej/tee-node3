@@ -18,10 +18,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-func BackupWallet(givenWallet *wallets.Wallet, providersPubKeys []*ecdsa.PublicKey, signingPolicyWeights []uint16, rewardEpochId uint32, teeId common.Address) (*backup.WalletBackup, error) {
-	adminsPubKeys := make([]types.ECDSAPublicKey, len(givenWallet.AdminsPublicKeys))
-	for i, pubKey := range givenWallet.AdminsPublicKeys {
-		adminsPubKeys[i] = types.PubKeyToStruct(pubKey)
+func BackupWallet(givenWallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, signingPolicyWeights []uint16, rewardEpochId uint32, teeId common.Address) (*backup.WalletBackup, error) {
+	adminPubKeys := make([]types.ECDSAPublicKey, len(givenWallet.AdminPublicKeys))
+	for i, pubKey := range givenWallet.AdminPublicKeys {
+		adminPubKeys[i] = types.PubKeyToStruct(pubKey)
 	}
 	normalizedWeights := settings.WeightsNormalization(signingPolicyWeights)
 	randomNonce, err := utils.GenerateRandom()
@@ -39,7 +39,7 @@ func BackupWallet(givenWallet *wallets.Wallet, providersPubKeys []*ecdsa.PublicK
 			RewardEpochID: rewardEpochId,
 			RandomNonce:   randomNonce,
 		},
-		AdminsPublicKeys:   adminsPubKeys,
+		AdminsPublicKeys:   adminPubKeys,
 		AdminsThreshold:    givenWallet.AdminsThreshold,
 		ProvidersThreshold: settings.DataProvidersBackupThreshold,
 		OpTypeConstants:    make([]byte, len(givenWallet.OpTypeConstants)),
@@ -54,21 +54,21 @@ func BackupWallet(givenWallet *wallets.Wallet, providersPubKeys []*ecdsa.PublicK
 		return nil, err
 	}
 
-	weightsOne := utils.ConstantSlice(1, len(givenWallet.AdminsPublicKeys))
-	adminEncryptedParts, err := SplitAndEncrypt(splitKey[0], givenWallet.AdminsPublicKeys, givenWallet.AdminsThreshold, weightsOne, metaData.WalletBackupId, givenWallet.PrivateKey, true)
+	weightsOne := utils.ConstantSlice(1, len(givenWallet.AdminPublicKeys))
+	adminEncryptedParts, err := SplitAndEncrypt(splitKey[0], givenWallet.AdminPublicKeys, givenWallet.AdminsThreshold, weightsOne, metaData.WalletBackupId, givenWallet.PrivateKey, true)
 	if err != nil {
 		return nil, err
 	}
 
-	providersEncryptedParts, err := SplitAndEncrypt(splitKey[1], providersPubKeys, settings.DataProvidersBackupThreshold, normalizedWeights, metaData.WalletBackupId, givenWallet.PrivateKey, false)
+	providerEncryptedParts, err := SplitAndEncrypt(splitKey[1], providerPubKeys, settings.DataProvidersBackupThreshold, normalizedWeights, metaData.WalletBackupId, givenWallet.PrivateKey, false)
 	if err != nil {
 		return nil, err
 	}
 
 	walletBackup := &backup.WalletBackup{
-		WalletBackupMetaData:    metaData,
-		AdminEncryptedParts:     adminEncryptedParts,
-		ProvidersEncryptedParts: providersEncryptedParts,
+		WalletBackupMetaData:   metaData,
+		AdminEncryptedParts:    adminEncryptedParts,
+		ProviderEncryptedParts: providerEncryptedParts,
 	}
 
 	hash, err := walletBackup.HashForSigning()
@@ -149,35 +149,35 @@ func RecoverWallet(
 	keyShares []*backup.KeySplit,
 	backupMetaData *backup.WalletBackupMetaData,
 ) (*wallets.Wallet, error) {
-	providersKeyShares := make([]*backup.KeySplit, 0)
-	adminsKeyShares := make([]*backup.KeySplit, 0)
+	providerKeyShares := make([]*backup.KeySplit, 0)
+	adminKeyShares := make([]*backup.KeySplit, 0)
 	for _, keySplit := range keyShares {
 		if keySplit.IsAdmin {
-			adminsKeyShares = append(adminsKeyShares, keySplit)
+			adminKeyShares = append(adminKeyShares, keySplit)
 		} else {
-			providersKeyShares = append(providersKeyShares, keySplit)
+			providerKeyShares = append(providerKeyShares, keySplit)
 		}
 	}
 
-	err := CheckKeyShares(adminsKeyShares, backupMetaData)
+	err := CheckKeyShares(adminKeyShares, backupMetaData)
 	if err != nil {
 		return nil, err
 	}
-	adminsKey, err := JoinKeyShares(adminsKeyShares, backupMetaData.AdminsThreshold)
-	if err != nil {
-		return nil, err
-	}
-
-	err = CheckKeyShares(providersKeyShares, backupMetaData)
-	if err != nil {
-		return nil, err
-	}
-	providersKey, err := JoinKeyShares(providersKeyShares, backupMetaData.ProvidersThreshold)
+	adminKey, err := JoinKeyShares(adminKeyShares, backupMetaData.AdminsThreshold)
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := JoinPrivateKeys([]*ecdsa.PrivateKey{adminsKey, providersKey})
+	err = CheckKeyShares(providerKeyShares, backupMetaData)
+	if err != nil {
+		return nil, err
+	}
+	providerKey, err := JoinKeyShares(providerKeyShares, backupMetaData.ProvidersThreshold)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := JoinPrivateKeys([]*ecdsa.PrivateKey{adminKey, providerKey})
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func RecoverWallet(
 		XrpAddress: xrpAddress,
 		Restored:   true,
 
-		AdminsPublicKeys:   adminsPubKeys,
+		AdminPublicKeys:    adminsPubKeys,
 		AdminsThreshold:    backupMetaData.AdminsThreshold,
 		Cosigners:          backupMetaData.Cosigners,
 		CosignersThreshold: backupMetaData.CosignersThreshold,

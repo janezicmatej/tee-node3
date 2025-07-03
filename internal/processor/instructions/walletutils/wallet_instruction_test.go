@@ -30,16 +30,16 @@ func TestKeyGenerate(t *testing.T) {
 	require.NoError(t, err)
 	teeId := node.GetTeeId()
 	numAdmins := 3
-	adminsPubKeys := make([]*ecdsa.PublicKey, numAdmins)
-	adminsPrivKeys := make([]*ecdsa.PrivateKey, numAdmins)
+	adminPubKeys := make([]*ecdsa.PublicKey, numAdmins)
+	adminPrivKeys := make([]*ecdsa.PrivateKey, numAdmins)
 	for i := range numAdmins {
-		adminsPrivKeys[i], err = crypto.GenerateKey()
+		adminPrivKeys[i], err = crypto.GenerateKey()
 		require.NoError(t, err)
-		adminsPubKeys[i] = &adminsPrivKeys[i].PublicKey
+		adminPubKeys[i] = &adminPrivKeys[i].PublicKey
 	}
-	adminsWalletPublicKeys := make([]walletcommon.PublicKey, len(adminsPubKeys))
-	for i, pubKey := range adminsPubKeys {
-		adminsWalletPublicKeys[i] = walletcommon.PublicKey(types.PubKeyToStruct(pubKey))
+	adminWalletPublicKeys := make([]walletcommon.PublicKey, len(adminPubKeys))
+	for i, pubKey := range adminPubKeys {
+		adminWalletPublicKeys[i] = walletcommon.PublicKey(types.PubKeyToStruct(pubKey))
 	}
 
 	numVoters, randSeed, epochId := 100, int64(12345), uint32(1)
@@ -52,8 +52,8 @@ func TestKeyGenerate(t *testing.T) {
 		OpType:   utils.StringToOpHash("WALLET"),
 		ConfigConstants: walletcommon.ITeeWalletKeyManagerKeyConfigConstants{
 			OpTypeConstants:    make([]byte, 0),
-			AdminsPublicKeys:   adminsWalletPublicKeys,
-			AdminsThreshold:    uint64(len(adminsWalletPublicKeys)),
+			AdminsPublicKeys:   adminWalletPublicKeys,
+			AdminsThreshold:    uint64(len(adminWalletPublicKeys)),
 			Cosigners:          make([]common.Address, 0),
 			CosignersThreshold: 0,
 		},

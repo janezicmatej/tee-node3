@@ -135,7 +135,7 @@ func GetSignerWeight(pubKey *ecdsa.PublicKey, policy *policy.SigningPolicy) uint
 	return policy.Weights[voterIndex]
 }
 
-const totalWeight = 1<<16 - 1
+const TotalWeight = 1<<16 - 1
 
 func GenerateRandomPolicyData(rewardEpochId uint32, voters []common.Address, seed int64) policy.SigningPolicy {
 	// Use specific seed for deterministic results
@@ -143,13 +143,13 @@ func GenerateRandomPolicyData(rewardEpochId uint32, voters []common.Address, see
 
 	startVotingRoundId := rgen.Uint32()
 
-	threshold := uint16(totalWeight / 2)
+	threshold := uint16(TotalWeight / 2)
 	randSeed := big.NewInt(rgen.Int63())
 	weights := []uint16{}
 
 	normalizedWeights := RandomNormalizedArray(len(voters), seed)
 	for _, w := range normalizedWeights {
-		weights = append(weights, uint16(w*totalWeight))
+		weights = append(weights, uint16(w*TotalWeight))
 	}
 
 	return policy.SigningPolicy{
