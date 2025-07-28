@@ -8,10 +8,10 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
-func StartServer(proxyUrl string) {
+func StartServer() {
 	err := node.InitNode(types.State{Status: big.NewInt(0)})
 	if err != nil {
 		panic(err)
 	}
-	processor.RunTeeProcessor(proxyUrl)
+	processor.RunTeeProcessor()
 }

@@ -31,6 +31,8 @@ func main() {
 		logger.Fatalf("self attestation failed: %v", err)
 	}
 
+	go settings.ProxyUrlConfigServer()
+
 	// Launch the json rpc server
-	processor.RunTeeProcessor(settings.ProxyUrl)
+	processor.RunTeeProcessor()
 }
