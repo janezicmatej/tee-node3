@@ -36,3 +36,7 @@ func DecodeTeeAttestationRequest(attReq []byte) (verification.ITeeVerificationTe
 
 	return unpacked, nil
 }
+
+type ConfigureProxyUrlRequest struct {
+	Url string
+}

@@ -9,8 +9,6 @@ import (
 // - 1 local (no attestation)
 var Mode = 1
 
-const ProxyUrl = "http://localhost:8545"
-
 const BIPSConstant = 10000
 const FtdcMinimumDataProvidersThreshold = float64(0.4)
 
@@ -19,6 +17,7 @@ const EncodingVersion = "1.0.0"
 // Processor configuration
 var QueuedActionsSleepTime = 100 * time.Millisecond
 
+const ProxyConfigureServerPort = 5500
 const ProxyTimeout = time.Second
 
 // Hardcoded configuration for operations and subcommands

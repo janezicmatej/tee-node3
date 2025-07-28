@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/json"
@@ -9,7 +10,6 @@ import (
 	"log"
 	"math/big"
 	"net/http"
-	"strconv"
 	"testing"
 	"time"
 
@@ -26,6 +26,7 @@ import (
 
 	commonwallet "github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/flare-foundation/tee-node/internal/node"
+	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/internal/testutils"
 	"github.com/flare-foundation/tee-node/internal/wallets"
 	"github.com/flare-foundation/tee-node/pkg/backup"
@@ -34,8 +35,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
-
-const proxyPort = 5500
 
 // todo: add cosigners to commonwallet, check xrp signature, verify signer sequence data (vote hash)
 func TestProcessorEndToEnd(t *testing.T) {
@@ -71,11 +70,14 @@ func TestProcessorEndToEnd(t *testing.T) {
 	mainActionInfoChan := make(chan *types.Action, 100)
 	readActionInfoChan := make(chan *types.Action, 100)
 	actionResponseChan := make(chan *types.ActionResponse, 100)
-	go MockProxy(t, mainActionInfoChan, readActionInfoChan, actionResponseChan)
+	proxyPort := 5501
+	go MockProxy(t, proxyPort, mainActionInfoChan, readActionInfoChan, actionResponseChan)
 
-	go RunTeeProcessor("http://localhost:" + strconv.Itoa(proxyPort))
-
+	go settings.ProxyUrlConfigServer()
+	go RunTeeProcessor()
 	time.Sleep(1 * time.Second)
+
+	setProxyUrl(t, proxyPort)
 
 	teeId, teePubKey := getTeeInfo(t, readActionInfoChan, actionResponseChan)
 
@@ -110,6 +112,22 @@ func TestProcessorEndToEnd(t *testing.T) {
 	ftdcProve(t, mainActionInfoChan, actionResponseChan, teeId, providerPrivKeys, adminPrivKeys, finalEpochId)
 
 	// todo: update policy
+}
+
+func setProxyUrl(t *testing.T, proxyPort int) {
+	request := types.ConfigureProxyUrlRequest{
+		Url: fmt.Sprintf("http://localhost:%d", proxyPort),
+	}
+
+	client := http.Client{
+		Timeout: settings.ProxyTimeout,
+	}
+	requestBody, err := json.Marshal(request)
+	require.NoError(t, err)
+
+	r, err := client.Post(fmt.Sprintf("http://localhost:%d/configure", settings.ProxyConfigureServerPort), "application/json", bytes.NewBuffer(requestBody))
+	require.NoError(t, err)
+	require.Equal(t, r.StatusCode, http.StatusOK)
 }
 
 func initializePolicy(t *testing.T, actionInfoChan chan *types.Action,
@@ -704,7 +722,7 @@ func ftdcProve(
 	require.NoError(t, err)
 }
 
-func MockProxy(t *testing.T, mainActionInfoChan, readActionInfoChan chan *types.Action,
+func MockProxy(t *testing.T, proxyPort int, mainActionInfoChan, readActionInfoChan chan *types.Action,
 	actionResponseChan chan *types.ActionResponse) {
 	router := mux.NewRouter()
 

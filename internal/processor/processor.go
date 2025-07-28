@@ -19,18 +19,26 @@ import (
 	"github.com/pkg/errors"
 )
 
-func RunTeeProcessor(proxyUrl string) {
-	go runQueueProcessing(proxyUrl, "main")
-	runQueueProcessing(proxyUrl, "read")
+func RunTeeProcessor() {
+	go runQueueProcessing("main")
+	runQueueProcessing("read")
 }
 
-func runQueueProcessing(proxyUrl string, queueId string) {
+func runQueueProcessing(queueId string) {
 	// V2: everything is ready for processing actions in parallel, should we?
 	for {
 		var action *types.Action
 		var response *types.ActionResponse
+		var err error
 
-		action, err := getAction(fmt.Sprintf("%s/queue/%s", proxyUrl, queueId))
+		settings.ProxyUrl.RLock()
+		proxyUrl := settings.ProxyUrl.Url
+		settings.ProxyUrl.RUnlock()
+		if proxyUrl == "" {
+			goto sleep
+		}
+
+		action, err = getAction(fmt.Sprintf("%s/queue/%s", proxyUrl, queueId))
 		if err != nil {
 			logger.Errorf("error getting action: %v", err)
 			goto sleep
