@@ -1,5 +1,5 @@
 # Build stage  
-FROM golang:1.23-alpine AS builder  
+FROM golang:1.24-alpine AS builder  
 
 # Install git and certificates (needed for private repos and some dependencies)  
 RUN apk add --no-cache git ca-certificates tzdata  
@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .  
 
 # Build the application  
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server cmd/server/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server cmd/main.go
 
 # ---------------------------- --------------------------------------------
 
@@ -29,18 +29,13 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy binary from builder  
 COPY --from=builder /app/server /app/server  
-COPY --from=builder /app/config.toml /app/config.toml  
-COPY --from=builder /app/google_confidential_space_root.crt /app/google_confidential_space_root.crt
+COPY --from=builder /app/assets/google_confidential_space_root.crt /app/assets/google_confidential_space_root.crt
 
 # Set environment variables  
 ENV TZ=UTC  
 
 # Expose port (adjust as needed)  
-EXPOSE 80
-EXPOSE 443/tcp
-EXPOSE 81/udp
-EXPOSE 8545
-EXPOSE 50040
+EXPOSE 5500
 
 # Run the application
 WORKDIR /app  
