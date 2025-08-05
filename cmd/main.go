@@ -19,10 +19,10 @@ func main() {
 	if err != nil {
 		logger.Fatalf("failed to load certificate: %v", err)
 	}
-	err = attestation.SelfAttest()
-	if err != nil {
-		logger.Fatalf("self attestation failed: %v", err)
-	}
+	// err = attestation.SelfAttest()
+	// if err != nil {
+	// 	logger.Fatalf("self attestation failed: %v", err)
+	// }
 
 	go settings.ProxyUrlConfigServer()
 
