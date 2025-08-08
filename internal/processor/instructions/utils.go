@@ -104,6 +104,7 @@ func checkDataProvidersThreshold(data *instruction.DataFixed, signers []common.A
 		rh := request.Header
 		if rh.ThresholdBIPS == 0 {
 			threshold = sPolicy.Threshold
+			break
 		} else {
 			threshold = (rh.ThresholdBIPS * totalWeight) / settings.MaxBIPS
 			if (rh.ThresholdBIPS*totalWeight)%settings.MaxBIPS > 0 {
