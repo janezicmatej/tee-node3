@@ -7,15 +7,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/flare-foundation/go-flare-common/pkg/tee/constants"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/pkg/errors"
 )
 
 func ParseNewWalletRequest(instructionData *instruction.DataFixed) (wallet.ITeeWalletKeyManagerKeyGenerate, error) {
-	arg := wallet.MessageArguments[constants.KeyGenerate]
+	arg := wallet.MessageArguments[op.KeyGenerate]
 
 	var unpacked wallet.ITeeWalletKeyManagerKeyGenerate
 	err := structs.DecodeTo(arg, instructionData.OriginalMessage, &unpacked)
@@ -35,7 +35,7 @@ func CheckNewWalletRequest(newWalletRequest wallet.ITeeWalletKeyManagerKeyGenera
 }
 
 func ParseDeleteWalletRequest(instructionData *instruction.DataFixed) (wallet.ITeeWalletKeyManagerKeyDelete, error) {
-	arg := wallet.MessageArguments[constants.KeyDelete]
+	arg := wallet.MessageArguments[op.KeyDelete]
 	var unpacked wallet.ITeeWalletKeyManagerKeyDelete
 	err := structs.DecodeTo(arg, instructionData.OriginalMessage, &unpacked)
 	if err != nil {
@@ -50,7 +50,7 @@ func ParseDeleteWalletRequest(instructionData *instruction.DataFixed) (wallet.IT
 }
 
 func ParseKeyDataProviderRestoreRequest(instructionData *instruction.DataFixed) (wallet.ITeeWalletBackupManagerKeyDataProviderRestore, error) {
-	arg := wallet.MessageArguments[constants.KeyDataProviderRestore]
+	arg := wallet.MessageArguments[op.KeyDataProviderRestore]
 	var unpacked wallet.ITeeWalletBackupManagerKeyDataProviderRestore
 	err := structs.DecodeTo(arg, instructionData.OriginalMessage, &unpacked)
 	if err != nil {

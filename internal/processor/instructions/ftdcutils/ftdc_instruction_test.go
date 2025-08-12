@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/flare-foundation/go-flare-common/pkg/tee/constants"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/connector"
 	"github.com/flare-foundation/tee-node/internal/node"
 	"github.com/flare-foundation/tee-node/internal/testutils"
@@ -50,8 +50,8 @@ func TestAbiDecodeFtdcAttestationResponse(t *testing.T) {
 		InstructionID: common.HexToHash("0x123"),
 		TeeID:         common.HexToAddress("0x123"),
 		RewardEpochID: 1,
-		OPType:        constants.FTDC.Hash(),
-		OPCommand:     constants.Prove.Hash(),
+		OPType:        op.FTDC.Hash(),
+		OPCommand:     op.Prove.Hash(),
 		//
 		OriginalMessage:        originalMessageEncoded,
 		AdditionalFixedMessage: responseBody,
