@@ -6,7 +6,6 @@ import (
 
 	"github.com/flare-foundation/tee-node/internal/policy"
 	"github.com/flare-foundation/tee-node/internal/settings"
-	"github.com/flare-foundation/tee-node/pkg/op"
 	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/utils"
 
@@ -14,20 +13,19 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	commonpolicy "github.com/flare-foundation/go-flare-common/pkg/policy"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
+
 	"github.com/pkg/errors"
 )
 
 // validateRequestSize checks the size of the request fields,
 func validateInstructionDataSize(data *instruction.DataFixed) error {
-	ok := op.IsValid(data.OPType, data.OPCommand)
+	ok := op.IsValidPair(data.OPType, data.OPCommand)
 	if !ok {
 		return errors.New("invalid OPType, OPCommand pair")
 	}
 
-	oc, ok := op.HashToOPCommandSafe(data.OPCommand)
-	if !ok {
-		return errors.New("invalid OPCommand")
-	}
+	oc := op.HashToOPCommand(data.OPCommand)
 
 	maxMsgSize, ok := settings.MaxRequestSize[oc]
 	if !ok {

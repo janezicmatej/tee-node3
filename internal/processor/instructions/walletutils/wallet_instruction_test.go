@@ -13,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/flare-foundation/go-flare-common/pkg/tee/constants"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	cwallet "github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func TestKeyGenerate(t *testing.T) {
 		TeeId:    teeId,
 		WalletId: walletId,
 		KeyId:    keyId,
-		OpType:   constants.XRP.Hash(),
+		OpType:   op.XRP.Hash(),
 		ConfigConstants: cwallet.ITeeWalletKeyManagerKeyConfigConstants{
 			OpTypeConstants:    make([]byte, 0),
 			AdminsPublicKeys:   adminWalletPublicKeys,
@@ -61,7 +61,7 @@ func TestKeyGenerate(t *testing.T) {
 			CosignersThreshold: 0,
 		},
 	}
-	originalMessageEncoded, err := abi.Arguments{cwallet.MessageArguments[constants.KeyGenerate]}.Pack(originalMessage)
+	originalMessageEncoded, err := abi.Arguments{cwallet.MessageArguments[op.KeyGenerate]}.Pack(originalMessage)
 	require.NoError(t, err)
 
 	instructionId, err := utils.GenerateRandom()
@@ -70,8 +70,8 @@ func TestKeyGenerate(t *testing.T) {
 		InstructionID:          instructionId,
 		TeeID:                  teeId,
 		RewardEpochID:          epochId,
-		OPType:                 constants.Wallet.Hash(),
-		OPCommand:              constants.KeyGenerate.Hash(),
+		OPType:                 op.Wallet.Hash(),
+		OPCommand:              op.KeyGenerate.Hash(),
 		OriginalMessage:        originalMessageEncoded,
 		AdditionalFixedMessage: nil,
 	}

@@ -10,10 +10,10 @@ import (
 	"github.com/flare-foundation/tee-node/internal/processor/instructions/signutils"
 	"github.com/flare-foundation/tee-node/internal/processor/instructions/walletutils"
 	"github.com/flare-foundation/tee-node/internal/settings"
-	"github.com/flare-foundation/tee-node/pkg/op"
 	"github.com/flare-foundation/tee-node/pkg/types"
 
 	commonpolicy "github.com/flare-foundation/go-flare-common/pkg/policy"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -286,7 +286,7 @@ func checkInstructionData(data *instruction.DataFixed) (*commonpolicy.SigningPol
 		return nil, errors.New("reward epoch id too old")
 	}
 
-	valid := op.IsValid(data.OPType, data.OPCommand)
+	valid := op.IsValidPair(data.OPType, data.OPCommand)
 	if !valid {
 		return nil, errors.New("invalid command for operation type")
 	}

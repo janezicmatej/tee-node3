@@ -5,8 +5,9 @@ import (
 
 	"github.com/flare-foundation/tee-node/internal/processor/direct/getutils"
 	"github.com/flare-foundation/tee-node/internal/processor/direct/policyutils"
-	"github.com/flare-foundation/tee-node/pkg/op"
 	"github.com/flare-foundation/tee-node/pkg/types"
+
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 )
 
 func ProcessDirectInstruction(i *types.DirectInstruction) ([]byte, error) {

@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/flare-foundation/go-flare-common/pkg/tee/constants"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/tee"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
@@ -73,12 +73,12 @@ type TeeInfoResponse struct {
 }
 
 func EncodeTeeAttestationRequest(req *verification.ITeeVerificationTeeAttestation) (hexutil.Bytes, error) {
-	arg := verification.MessageArguments[constants.TEEAttestation]
+	arg := verification.MessageArguments[op.TEEAttestation]
 	return structs.Encode(arg, &req)
 }
 
 func DecodeTeeAttestationRequest(attReq []byte) (verification.ITeeVerificationTeeAttestation, error) {
-	arg := verification.MessageArguments[constants.TEEAttestation]
+	arg := verification.MessageArguments[op.TEEAttestation]
 
 	var unpacked verification.ITeeVerificationTeeAttestation
 	err := structs.DecodeTo(arg, attReq, &unpacked)

@@ -3,7 +3,7 @@ package settings
 import (
 	"time"
 
-	"github.com/flare-foundation/tee-node/pkg/op"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 )
 
 // Modes:

@@ -15,8 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/flare-foundation/go-flare-common/pkg/tee/constants"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
@@ -53,7 +53,7 @@ func CreateMockWallet(
 		TeeId:    nodeId,
 		WalletId: walletId,
 		KeyId:    keyId,
-		OpType:   constants.Wallet.Hash(),
+		OpType:   op.Wallet.Hash(),
 		ConfigConstants: wallet.ITeeWalletKeyManagerKeyConfigConstants{
 			OpTypeConstants:    make([]byte, 0),
 			AdminsPublicKeys:   adminPubKeys,
@@ -62,15 +62,15 @@ func CreateMockWallet(
 			CosignersThreshold: uint64(len(cosignerPubKeys)),
 		},
 	}
-	encoded, err := abi.Arguments{wallet.MessageArguments[constants.KeyGenerate]}.Pack(request)
+	encoded, err := abi.Arguments{wallet.MessageArguments[op.KeyGenerate]}.Pack(request)
 	require.NoError(t, err)
 
 	instructionDataFixed := instruction.DataFixed{
 		InstructionID:          common.BytesToHash(instructionIdBytes),
 		TeeID:                  nodeId,
 		RewardEpochID:          rewardEpochId,
-		OPType:                 constants.Wallet.Hash(),
-		OPCommand:              constants.KeyGenerate.Hash(),
+		OPType:                 op.Wallet.Hash(),
+		OPCommand:              op.KeyGenerate.Hash(),
 		OriginalMessage:        encoded,
 		AdditionalFixedMessage: nil,
 	}
@@ -104,12 +104,12 @@ func BuildMockPaymentOriginalMessage(t *testing.T, mockWallet common.Hash, teeID
 		BatchEndTs:       uint64(0),
 	}
 
-	originalMessageEncoded, err := abi.Arguments{payment.MessageArguments[constants.Pay]}.Pack(originalMessage)
+	originalMessageEncoded, err := abi.Arguments{payment.MessageArguments[op.Pay]}.Pack(originalMessage)
 	require.NoError(t, err)
 	return originalMessageEncoded
 }
 
-func BuildMockQueuedActionInstruction(opType constants.OPType, opCommand constants.OPCommand, originalMessage []byte,
+func BuildMockQueuedActionInstruction(opType op.Type, opCommand op.Command, originalMessage []byte,
 	privKeys []*ecdsa.PrivateKey, teeId common.Address, rewardEpochId uint32,
 	additionalFixedMessageRaw any, variableMessages []any,
 	submissionTag types.SubmissionTag, timestamp uint64,
@@ -203,7 +203,7 @@ func BuildMockQueuedActionInstruction(opType constants.OPType, opCommand constan
 	return &action, nil
 }
 
-func BuildMockQueuedAction(t *testing.T, opType constants.OPType, opCommand constants.OPCommand, messageRaw any) *types.Action {
+func BuildMockQueuedAction(t *testing.T, opType op.Type, opCommand op.Command, messageRaw any) *types.Action {
 	var message []byte
 	var err error
 	switch messageRaw := messageRaw.(type) {
