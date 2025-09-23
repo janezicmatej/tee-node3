@@ -23,10 +23,12 @@ type Storage struct {
 	sync.RWMutex
 }
 
+// InitializeStorage returns an empty policy storage.
 func InitializeStorage() *Storage {
 	return &Storage{signingPolicies: make(map[uint32]*policy.SigningPolicy)}
 }
 
+// SetInitialPolicy stores the first signing policy and associated public keys.
 func (s *Storage) SetInitialPolicy(policy *policy.SigningPolicy, addressesToPublicKeys map[common.Address]*ecdsa.PublicKey) error {
 	if s.active != nil {
 		return errors.New("signing policy already initialized")
@@ -47,10 +49,12 @@ func (s *Storage) SetInitialPolicy(policy *policy.SigningPolicy, addressesToPubl
 	return nil
 }
 
+// InitialPolicyIDAndHash returns the ID and hash of the first policy.
 func (s *Storage) InitialPolicyIDAndHash() (uint32, common.Hash) {
 	return s.initialPolicyID, s.initialPolicyHash
 }
 
+// ActiveSigningPolicy returns a copy of the currently active policy.
 func (s *Storage) ActiveSigningPolicy() (*policy.SigningPolicy, error) {
 	if s.active == nil {
 		return nil, errors.New("signing policy not initialized")
@@ -87,6 +91,7 @@ func (s *Storage) SigningPolicy(epochID uint32) (*policy.SigningPolicy, error) {
 	return &pCopy, nil
 }
 
+// SetActiveSigningPolicy marks the provided policy as active.
 func (s *Storage) SetActiveSigningPolicy(policy *policy.SigningPolicy) error {
 	if s.initialPolicyHash.Cmp(common.Hash{}) == 0 {
 		return errors.New("signing policy not initialized yet")
@@ -97,6 +102,7 @@ func (s *Storage) SetActiveSigningPolicy(policy *policy.SigningPolicy) error {
 	return nil
 }
 
+// SetActiveSigningPolicyPublicKeys stores the public keys for the active policy.
 func (s *Storage) SetActiveSigningPolicyPublicKeys(addressesToPublicKeys map[common.Address]*ecdsa.PublicKey) error {
 	if s.initialPolicyHash.Cmp(common.Hash{}) == 0 {
 		return errors.New("signing policy not initialized yet")
@@ -105,6 +111,8 @@ func (s *Storage) SetActiveSigningPolicyPublicKeys(addressesToPublicKeys map[com
 	return nil
 }
 
+// ActiveSigningPolicyPublicKeys returns the public keys for the active policy in
+// voter order.
 func (s *Storage) ActiveSigningPolicyPublicKeys() ([]*ecdsa.PublicKey, error) {
 	return toSigningPolicyPublicKeysSlice(s.active, s.activePublicKeys)
 }
@@ -137,6 +145,7 @@ func WeightOfSigners(signers []common.Address, signingPolicy *policy.SigningPoli
 	return currentWeight
 }
 
+// DestroyState resets the storage to an uninitialized state.
 func (s *Storage) DestroyState() {
 	s.active = nil
 	s.signingPolicies = make(map[uint32]*policy.SigningPolicy)

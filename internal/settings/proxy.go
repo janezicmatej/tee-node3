@@ -23,6 +23,8 @@ type ProxyConfigureServer struct {
 	ProxyUrl *ProxyURLMutex
 }
 
+// NewProxyConfigServer creates an HTTP server that accepts proxy configuration
+// requests on the provided port and exposes the configured URL via ProxyUrl.
 func NewProxyConfigServer(setProxyPort int) *ProxyConfigureServer {
 	proxyUrl := &ProxyURLMutex{}
 	proxyUrl.setProxyUrlFromEnv()
@@ -58,10 +60,12 @@ func (proxyUrl *ProxyURLMutex) setProxyUrlFromEnv() {
 	}
 }
 
+// Serve starts the proxy configuration server and blocks until it stops.
 func (pc *ProxyConfigureServer) Serve() error {
 	return pc.server.ListenAndServe()
 }
 
+// Close gracefully shuts down the proxy configuration server.
 func (pc *ProxyConfigureServer) Close(ctx context.Context) error {
 	return pc.server.Shutdown(ctx)
 }

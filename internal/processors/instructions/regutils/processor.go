@@ -20,6 +20,8 @@ type Processor struct {
 	pStorage *policy.Storage
 }
 
+// NewProcessor returns a registration utility processor bound to the provided
+// node informer and policy storage.
 func NewProcessor(informer node.Informer, pStorage *policy.Storage) Processor {
 	return Processor{
 		Informer: informer,
@@ -27,6 +29,9 @@ func NewProcessor(informer node.Informer, pStorage *policy.Storage) Processor {
 	}
 }
 
+// TEEAttestation handles the registration attestation instruction, producing a
+// TEE info response when the threshold is reached and acknowledging other
+// submission stages.
 func (p *Processor) TEEAttestation(
 	submissionTag types.SubmissionTag,
 	dataFixed *instruction.DataFixed,

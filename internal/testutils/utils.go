@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// GenerateRandomBytes returns n cryptographically secure random bytes.
 func GenerateRandomBytes(n int) ([]byte, error) {
 	b := make([]byte, n)
 	if _, err := io.ReadFull(cryptorand.Reader, b); err != nil {
@@ -33,6 +34,8 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
+// EncodeSigningPolicy serializes a relay signing policy into the byte layout
+// expected by the TEE.
 func EncodeSigningPolicy(policy *relay.RelaySigningPolicyInitialized) ([]byte, error) {
 	// Validation
 	if policy == nil {
@@ -102,6 +105,8 @@ func EncodeSigningPolicy(policy *relay.RelaySigningPolicyInitialized) ([]byte, e
 	return result, nil
 }
 
+// GenerateRandomValidPolicyAndSigners produces a random policy alongside
+// matching voter identities for tests.
 func GenerateRandomValidPolicyAndSigners(epochId uint32, randSeed int64, numVoters int) (*commonpolicy.SigningPolicy, []common.Address, []*ecdsa.PrivateKey, []types.PublicKey, error) {
 	// Generate random voters and corresponding private keys
 	voters, privKeys, pubKeysMap := GenerateRandomKeys(numVoters)
@@ -137,6 +142,8 @@ func GenerateRandomValidPolicyAndSigners(epochId uint32, randSeed int64, numVote
 // 	return multiSignedPolicyArray, nil
 // }
 
+// BuildMultiSignedPolicy signs the provided policy bytes with all given voter
+// keys and returns the multisigned wrapper.
 func BuildMultiSignedPolicy(policyBytes []byte, voterPrivKeys []*ecdsa.PrivateKey) types.MultiSignedPolicy {
 	sigs := make([][]byte, 0, len(voterPrivKeys))
 
@@ -156,6 +163,8 @@ func BuildMultiSignedPolicy(policyBytes []byte, voterPrivKeys []*ecdsa.PrivateKe
 	}
 }
 
+// GenerateRandomKeys creates a deterministic set of voters and key material for
+// test policies.
 func GenerateRandomKeys(numVoters int) ([]common.Address, []*ecdsa.PrivateKey, map[common.Address]*ecdsa.PublicKey) {
 	voters := make([]common.Address, numVoters)
 	privKeys := make([]*ecdsa.PrivateKey, numVoters)
@@ -176,6 +185,8 @@ func GenerateRandomKeys(numVoters int) ([]common.Address, []*ecdsa.PrivateKey, m
 	return voters, privKeys, pubKeys
 }
 
+// GetSignerWeight returns the voting weight of the provided public key for the
+// supplied policy.
 func GetSignerWeight(pubKey *ecdsa.PublicKey, policy *commonpolicy.SigningPolicy) uint16 {
 	// Convert the public key to an Ethereum address
 	address := crypto.PubkeyToAddress(*pubKey)
@@ -185,6 +196,8 @@ func GetSignerWeight(pubKey *ecdsa.PublicKey, policy *commonpolicy.SigningPolicy
 
 const TotalWeight = 1<<16 - 1
 
+// GenerateRandomPolicyData constructs a pseudo-random signing policy based on
+// the provided voters and seed.
 func GenerateRandomPolicyData(rewardEpochId uint32, voters []common.Address, seed int64) (*commonpolicy.SigningPolicy, error) {
 	// Use specific seed for deterministic results
 	rgen := rand.New(rand.NewSource(seed)) //nolint:gosec // only used for tests
@@ -220,8 +233,8 @@ func GenerateRandomPolicyData(rewardEpochId uint32, voters []common.Address, see
 	return policy, nil
 }
 
-// Loop through the voters and weights and calculate the total weight
-// return the index of the voter at which the accumulated voterWeight passes the threshold
+// GetThresholdReachedVoterIndex returns the index at which the accumulated
+// voter weight crosses the policy threshold.
 func GetThresholdReachedVoterIndex(nextPolicy *commonpolicy.SigningPolicy, voterPrivKeys []*ecdsa.PrivateKey) (int, uint16) {
 	var weightSum uint16 = 0
 	for i := range voterPrivKeys {
@@ -238,7 +251,7 @@ func GetThresholdReachedVoterIndex(nextPolicy *commonpolicy.SigningPolicy, voter
 	return len(voterPrivKeys) - 1, weightSum
 }
 
-// RandomNormalizedArray generates an array of n random floats that sum to 1
+// RandomNormalizedArray generates an array of n random floats that sum to 1.
 func RandomNormalizedArray(n int, seed int64) []float64 {
 	// Initialize random source with seed
 	source := rand.NewSource(seed)
@@ -262,7 +275,8 @@ func RandomNormalizedArray(n int, seed int64) []float64 {
 	return numbers
 }
 
-// This will construct a Mock Signing Policy, set it on the Tee and return the policy
+// GenerateAndSetInitialPolicy creates a mock policy, stores it in the provided
+// storage, and returns the policy with its voters and keys.
 func GenerateAndSetInitialPolicy(ps *ppolicy.Storage, numVoters int, randSeed int64, epochId uint32) (*commonpolicy.SigningPolicy, []common.Address, []*ecdsa.PrivateKey, error) {
 	// Generate random voters and corresponding private keys
 	voters, privKeys, pubKeys := GenerateRandomKeys(numVoters)
@@ -289,7 +303,7 @@ type ProvidersJSON struct {
 	PrivKeys []string `json:"privKeys"` // Private keys as hex strings
 }
 
-// MarshalProviders converts Providers struct to a JSON string.
+// MarshalProviders converts the Providers struct to a JSON payload.
 func MarshalProviders(providers *Providers) ([]byte, error) {
 	var voters []string
 	for _, v := range providers.Voters {
@@ -308,7 +322,7 @@ func MarshalProviders(providers *Providers) ([]byte, error) {
 	return jsonData, err
 }
 
-// UnmarshalProviders converts a JSON string back to a Providers struct.
+// UnmarshalProviders reconstructs Providers from the JSON payload.
 func UnmarshalProviders(jsonData []byte) (*Providers, error) {
 	var providersJSON ProvidersJSON
 	err := json.Unmarshal(jsonData, &providersJSON)
@@ -334,6 +348,7 @@ func UnmarshalProviders(jsonData []byte) (*Providers, error) {
 	return &Providers{Voters: voters, PrivKeys: privKeys}, nil
 }
 
+// Post marshals the request, sends it as JSON, and decodes the response into R.
 func Post[R any](url string, req any) (R, error) {
 	requestBody, err := json.Marshal(req)
 	if err != nil {

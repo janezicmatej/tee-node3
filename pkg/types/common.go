@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 )
 
-// todo: this should be in go-common
+// ParsePubKey converts the serialized public key into an ECDSA key.
 func ParsePubKey(key PublicKey) (*ecdsa.PublicKey, error) {
 	x := new(big.Int).SetBytes(key.X[:])
 	y := new(big.Int).SetBytes(key.Y[:])
@@ -20,6 +20,7 @@ func ParsePubKey(key PublicKey) (*ecdsa.PublicKey, error) {
 	return &ecdsa.PublicKey{Curve: secp256k1.S256(), X: x, Y: y}, nil
 }
 
+// PubKeyToStruct converts an ECDSA public key into the fixed-size struct form.
 func PubKeyToStruct(key *ecdsa.PublicKey) PublicKey {
 	var newKey PublicKey
 	xBytes := key.X.Bytes()
@@ -38,6 +39,7 @@ func PubKeyToStruct(key *ecdsa.PublicKey) PublicKey {
 	return newKey
 }
 
+// PubKeyToBytes returns the concatenated x and y coordinates of the key.
 func PubKeyToBytes(key *ecdsa.PublicKey) []byte {
 	xBytes := key.X.Bytes()
 	yBytes := key.Y.Bytes()

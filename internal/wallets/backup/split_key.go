@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// SplitPrivateKey splits the private key into n additive shares in the curve
+// field.
 func SplitPrivateKey(privateKey *ecdsa.PrivateKey, n int) ([]*ecdsa.PrivateKey, error) {
 	if n < 2 {
 		return nil, errors.New("number of splits too low")
@@ -36,6 +38,7 @@ func SplitPrivateKey(privateKey *ecdsa.PrivateKey, n int) ([]*ecdsa.PrivateKey, 
 	return privateKeys, nil
 }
 
+// JoinPrivateKeys recombines additive key shares back into a single key.
 func JoinPrivateKeys(privateKeys []*ecdsa.PrivateKey) (*ecdsa.PrivateKey, error) {
 	if len(privateKeys) == 0 {
 		return nil, errors.New("no private keys")

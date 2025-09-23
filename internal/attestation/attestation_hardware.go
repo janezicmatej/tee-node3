@@ -11,6 +11,8 @@ import (
 	"github.com/google/go-tpm-tools/proto/attest"
 )
 
+// CreateHardwareAttestation produces an attestation report using the local TPM
+// and TDX quote provider for the supplied nonce.
 func CreateHardwareAttestation(nonce []byte) (*attest.Attestation, error) {
 	var attestOpts client.AttestOpts
 	attestOpts.Nonce = nonce
@@ -59,7 +61,7 @@ func CreateHardwareAttestation(nonce []byte) (*attest.Attestation, error) {
 	return attestation, nil
 }
 
-// Using GOB encoding (binary format, Go-specific)
+// EncodeAttestationGob serializes the attestation using Go's binary GOB format.
 func EncodeAttestationGob(att *attest.Attestation) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
@@ -67,6 +69,7 @@ func EncodeAttestationGob(att *attest.Attestation) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// DecodeAttestationGob deserializes a GOB-encoded attestation.
 func DecodeAttestationGob(data []byte) (*attest.Attestation, error) {
 	att := &attest.Attestation{}
 	buf := bytes.NewBuffer(data)
@@ -75,12 +78,13 @@ func DecodeAttestationGob(data []byte) (*attest.Attestation, error) {
 	return att, err
 }
 
-// Using JSON encoding (text format, more portable)
+// EncodeAttestationJSON marshals the attestation to a JSON string.
 func EncodeAttestationJSON(att *attest.Attestation) (string, error) {
 	data, err := json.Marshal(att)
 	return string(data), err
 }
 
+// DecodeAttestationJSON unmarshals a JSON-encoded attestation string.
 func DecodeAttestationJSON(data string) (*attest.Attestation, error) {
 	att := &attest.Attestation{}
 	err := json.Unmarshal([]byte(data), att)

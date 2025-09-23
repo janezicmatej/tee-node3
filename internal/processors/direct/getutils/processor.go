@@ -21,6 +21,8 @@ type Processor struct {
 	wStorage *wallets.Storage
 }
 
+// NewProcessor builds a direct processor that serves TEE metadata and wallet
+// information.
 func NewProcessor(aAndS node.InformerAndSigner, policyStorage *policy.Storage, walletsStorage *wallets.Storage) Processor {
 	return Processor{
 		InformerAndSigner: aAndS,
@@ -29,6 +31,7 @@ func NewProcessor(aAndS node.InformerAndSigner, policyStorage *policy.Storage, w
 	}
 }
 
+// TEEInfo returns the TEE info response associated with the given challenge.
 func (p *Processor) TEEInfo(i *types.DirectInstruction) ([]byte, error) {
 	var req types.TeeInfoRequest
 	err := json.Unmarshal(i.Message, &req)
@@ -55,6 +58,7 @@ func (p *Processor) TEEInfo(i *types.DirectInstruction) ([]byte, error) {
 	return resultEncoded, nil
 }
 
+// KeysInfo lists the stored wallets as signed existence proofs.
 func (p *Processor) KeysInfo(_ *types.DirectInstruction) ([]byte, error) {
 	teeID := p.Info().TeeID
 
@@ -87,6 +91,7 @@ func (p *Processor) KeysInfo(_ *types.DirectInstruction) ([]byte, error) {
 	return res, nil
 }
 
+// TEEBackup produces a TEE-signed backup package for the requested wallet key.
 func (p *Processor) TEEBackup(i *types.DirectInstruction) ([]byte, error) {
 	var idPair wallets.KeyIDPair
 	err := json.Unmarshal(i.Message, &idPair)

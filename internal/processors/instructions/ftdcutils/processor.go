@@ -17,10 +17,13 @@ type Processor struct {
 	node.Signer
 }
 
+// NewProcessor creates an FTDC proof processor backed by the provided signer.
 func NewProcessor(sig node.Signer) Processor {
 	return Processor{Signer: sig}
 }
 
+// Prove verifies the FTDC request, aggregates the data provider and cosigner
+// signatures, and returns the encoded proof payload signed by the TEE.
 func (p *Processor) Prove(
 	_ types.SubmissionTag,
 	dataFixed *instruction.DataFixed,

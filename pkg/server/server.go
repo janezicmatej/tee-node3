@@ -12,9 +12,8 @@ import (
 	"github.com/flare-foundation/go-flare-common/pkg/logger"
 )
 
-// Starts PMW tee node.
-//
-// setProxyPort is the port that exposes endpoint for setting proxy's url.
+// StartServerPMW boots the PMW TEE node and exposes the proxy configuration
+// endpoint on the provided port.
 func StartServerPMW(setProxyPort int) {
 	logger.Set(logger.Config{Console: true, Level: settings.LogLevel})
 
@@ -34,11 +33,8 @@ func StartServerPMW(setProxyPort int) {
 	r.Run(teeNode)
 }
 
-// Starts tee node for extensions.
-//
-// setProxyPort is the port that exposes endpoint for setting proxy's url.
-// serverPort is the port that exposes endpoints for extension interaction.
-// extensionPort is the port where where extension exposes /action endpoint.
+// StartServerExtension runs the extension-enabled TEE node and supporting
+// HTTP servers.
 func StartServerExtension(setProxyPort, serverPort, extensionPort int) {
 	logger.Set(logger.Config{Console: true, Level: settings.LogLevel})
 
@@ -63,10 +59,8 @@ func StartServerExtension(setProxyPort, serverPort, extensionPort int) {
 	r.Run(teeNode)
 }
 
-// Starts the example extension.
-//
-// serverPort is the port where tee node severs endpoints for interaction.
-// extensionPort is the port where where extension exposes /action endpoint.
+// StartExampleExtension launches the dummy extension server on the configured
+// ports.
 func StartExampleExtension(serverPort, extensionPort int) {
 	server := exampleextension.NewDummyExtensionServer(extensionPort, serverPort)
 

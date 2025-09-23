@@ -32,6 +32,7 @@ type GoogleTeeClaims struct {
 	jwt.StandardClaims
 }
 
+// Valid satisfies the jwt.Claims interface without additional checks.
 func (c GoogleTeeClaims) Valid() error {
 	return nil
 }
@@ -261,6 +262,7 @@ func CompareCertificates(cert1 *x509.Certificate, cert2 *x509.Certificate) error
 	return nil
 }
 
+// LoadRootCert reads and parses the PEM-encoded root certificate.
 func LoadRootCert(fileName string) (*x509.Certificate, error) {
 	rootCertBytes, err := os.ReadFile(fileName)
 	if err != nil {
@@ -272,7 +274,7 @@ func LoadRootCert(fileName string) (*x509.Certificate, error) {
 	return cert, err
 }
 
-// todo:
+// ValidateClaims performs basic validation on the attestation claims.
 func ValidateClaims(token jwt.Token, nonces []string) (bool, error) {
 	if !token.Valid {
 		return false, errors.New("token not valid")

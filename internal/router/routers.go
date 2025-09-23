@@ -17,6 +17,8 @@ import (
 	pnode "github.com/flare-foundation/tee-node/pkg/node"
 )
 
+// NewPMWRouter wires direct and instruction processors for the Protocol Managed
+// Wallet service, without the extension defaults.
 func NewPMWRouter(teeNode *pnode.Node, wStorage *wallets.Storage, pStorage *policy.Storage, proxyUrl *settings.ProxyURLMutex) Router {
 	r := New(proxyUrl)
 
@@ -48,6 +50,8 @@ func NewPMWRouter(teeNode *pnode.Node, wStorage *wallets.Storage, pStorage *poli
 	return r
 }
 
+// NewExtensionRouter assembles a router that manages base actions and
+// forwards remaining actions to the external extension service.
 func NewExtensionRouter(teeNode *pnode.Node, wStorage *wallets.Storage, pStorage *policy.Storage, extensionPort int, proxyUrl *settings.ProxyURLMutex) Router {
 	r := New(proxyUrl)
 

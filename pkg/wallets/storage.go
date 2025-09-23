@@ -14,6 +14,7 @@ type Storage struct {
 	sync.RWMutex
 }
 
+// InitializeStorage returns an empty wallet storage instance.
 func InitializeStorage() *Storage {
 	return &Storage{
 		wallets:   make(map[KeyIDPair]*Wallet),
@@ -21,6 +22,7 @@ func InitializeStorage() *Storage {
 	}
 }
 
+// Store adds the wallet to storage while preserving status state.
 func (s *Storage) Store(wallet *Wallet) error {
 	idPair := KeyIDPair{WalletID: wallet.WalletID, KeyID: wallet.KeyID}
 	walletCopied := CopyWallet(wallet)
@@ -43,6 +45,7 @@ func (s *Storage) Store(wallet *Wallet) error {
 	return nil
 }
 
+// Remove deletes the wallet entry for the given identifier pair.
 func (s *Storage) Remove(idPair KeyIDPair) {
 	s.Lock()
 	defer s.Unlock()
@@ -51,6 +54,7 @@ func (s *Storage) Remove(idPair KeyIDPair) {
 
 var ErrWalletNonExistent = errors.New("wallet non-existent")
 
+// Get retrieves a copy of the wallet or returns ErrWalletNonExistent.
 func (s *Storage) Get(idPair KeyIDPair) (*Wallet, error) {
 	s.RLock()
 	defer s.RUnlock()
@@ -63,6 +67,7 @@ func (s *Storage) Get(idPair KeyIDPair) (*Wallet, error) {
 	return walletCopy, nil
 }
 
+// GetWallets returns deep copies of all stored wallets.
 func (s *Storage) GetWallets() []*Wallet {
 	wallets := make([]*Wallet, len(s.wallets))
 	i := 0
@@ -76,6 +81,7 @@ func (s *Storage) GetWallets() []*Wallet {
 	return wallets
 }
 
+// WalletExists reports whether the wallet is present in storage.
 func (s *Storage) WalletExists(idPair KeyIDPair) bool {
 	s.RLock()
 	defer s.RUnlock()
@@ -83,6 +89,7 @@ func (s *Storage) WalletExists(idPair KeyIDPair) bool {
 	return ok
 }
 
+// CheckNonce ensures the provided nonce is newer than the stored one.
 func (s *Storage) CheckNonce(idPair KeyIDPair, nonce uint64) error {
 	s.RLock()
 	defer s.RUnlock()
@@ -97,6 +104,7 @@ func (s *Storage) CheckNonce(idPair KeyIDPair, nonce uint64) error {
 	return nil
 }
 
+// Nonce returns the stored nonce for the wallet.
 func (s *Storage) Nonce(idPair KeyIDPair) (uint64, error) {
 	s.RLock()
 	defer s.RUnlock()
@@ -108,6 +116,7 @@ func (s *Storage) Nonce(idPair KeyIDPair) (uint64, error) {
 	return walletStatus.Nonce, nil
 }
 
+// UpdateNonce sets the wallet's nonce to the provided value.
 func (s *Storage) UpdateNonce(idPair KeyIDPair, nonce uint64) {
 	s.Lock()
 	defer s.Unlock()
@@ -116,6 +125,7 @@ func (s *Storage) UpdateNonce(idPair KeyIDPair, nonce uint64) {
 	}
 }
 
+// DestroyState clears all wallet data from storage.
 func (s *Storage) DestroyState() {
 	s.Lock()
 	defer s.Unlock()

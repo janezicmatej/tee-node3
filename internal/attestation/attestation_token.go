@@ -13,6 +13,8 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/attestation"
 )
 
+// GetGoogleAttestationToken retrieves an attestation token for the supplied
+// nonces and token type, short-circuiting to MagicPass outside production.
 func GetGoogleAttestationToken(nonces []string, tokenType attestation.TokenType) ([]byte, error) {
 	if settings.Mode != 0 {
 		return []byte(attestation.MagicPass), nil
@@ -60,6 +62,7 @@ func GetGoogleAttestationToken(nonces []string, tokenType attestation.TokenType)
 	return tokenBytes, nil
 }
 
+// CreateAttestation returns the attestation token as a string for convenience.
 func CreateAttestation(nonces []string, tokenType attestation.TokenType) (string, error) {
 	var tokenBytes []byte
 	var err error

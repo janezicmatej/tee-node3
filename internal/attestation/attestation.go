@@ -15,6 +15,8 @@ import (
 
 var GoogleCert *x509.Certificate
 
+// SetGoogleCert loads the Google root certificate into memory for attestation
+// validation.
 func SetGoogleCert() error {
 	var err error
 	GoogleCert, err = attestation.LoadRootCert(settings.GoogleCertLoc)
@@ -25,6 +27,8 @@ func SetGoogleCert() error {
 	return nil
 }
 
+// SelfAttest performs a local attestation cycle, falling back to MagicPass in
+// non-production modes.
 func SelfAttest() error {
 	tokeBytes, err := GetGoogleAttestationToken([]string{}, "PKI")
 	if err != nil {

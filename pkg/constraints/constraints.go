@@ -51,6 +51,8 @@ func constraints(opCommand common.Hash) (sizeConstraint, error) {
 	}
 }
 
+// CheckSize ensures the fixed portion of the instruction adheres to configured
+// size limits.
 func CheckSize(data *instruction.DataFixed) error {
 	c, err := constraints(data.OPCommand)
 	if err != nil {
@@ -67,6 +69,8 @@ func CheckSize(data *instruction.DataFixed) error {
 	return nil
 }
 
+// CheckSizeVariableMessages enforces size limits on variable messages for the
+// given instruction command.
 func CheckSizeVariableMessages(opCommand common.Hash, variableMessages []hexutil.Bytes) error {
 	c, err := constraints(opCommand)
 	if err != nil {

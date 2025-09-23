@@ -23,6 +23,7 @@ type Processor interface {
 
 type ProcessFunc func(*types.Action) types.ActionResult
 
+// Process calls the wrapped function to produce an action result.
 func (p ProcessFunc) Process(a *types.Action) types.ActionResult {
 	return p(a)
 }
@@ -39,16 +40,20 @@ type Router struct {
 	proxyUrl *settings.ProxyURLMutex
 }
 
+// New creates a router associated with the provided proxy URL mutex.
 func New(proxyUrl *settings.ProxyURLMutex) Router {
 	return Router{proxyUrl: proxyUrl}
 }
 
+// Run spawns workers processing queues for both the instructions and
+// direct instructions.
 func (r Router) Run(signer node.Signer) {
 	go r.ServeQueue(processorutils.Main, signer)
 	r.ServeQueue(processorutils.Direct, signer)
 }
 
-// ServeQueue starts an endless loop that fetches actions from proxy's queue, processes them, and posts the response to the proxy.
+// ServeQueue starts an endless loop that fetches actions from proxy's queue,
+// processes them, and posts the response to the proxy.
 func (r *Router) ServeQueue(id processorutils.QueueID, signer node.Signer) {
 	logger.Infof("%s queue: processing started", id)
 	for {
@@ -113,14 +118,18 @@ func (r *Router) RegisterProcessor(opType op.Type, opCommand op.Command, process
 	r.routs[routID] = processor
 }
 
+// RegisterProcessFunc stores a ProcessFunc for the given op pair.
 func (r *Router) RegisterProcessFunc(opType op.Type, opCommand op.Command, processFunc ProcessFunc) {
 	r.RegisterProcessor(opType, opCommand, processFunc)
 }
 
+// RegisterDirectProcessor registers a direct processor for the given op pair.
 func (r *Router) RegisterDirectProcessor(opType op.Type, opCommand op.Command, processor direct.Processor) {
 	r.RegisterProcessor(opType, opCommand, processor)
 }
 
+// RegisterInstructionProcessor registers an instruction processor for the given
+// op pair.
 func (r *Router) RegisterInstructionProcessor(opType op.Type, opCommand op.Command, processor instructions.Processor) {
 	r.RegisterProcessor(opType, opCommand, processor)
 }

@@ -17,10 +17,14 @@ type Processor struct {
 	*policy.Storage
 }
 
+// NewProcessor returns a policy utility processor backed by the provided
+// storage.
 func NewProcessor(policyStorage *policy.Storage) Processor {
 	return Processor{Storage: policyStorage}
 }
 
+// InitializePolicy sets the first signing policy along with its associated
+// public keys.
 func (p *Processor) InitializePolicy(i *types.DirectInstruction) ([]byte, error) {
 	var err error
 	defer func() {
@@ -61,6 +65,8 @@ func (p *Processor) InitializePolicy(i *types.DirectInstruction) ([]byte, error)
 	return nil, nil
 }
 
+// UpdatePolicy validates and applies the next signing policy from a
+// multisigned submission.
 func (p *Processor) UpdatePolicy(i *types.DirectInstruction) ([]byte, error) {
 	var req types.UpdatePolicyRequest
 	err := json.Unmarshal(i.Message, &req)

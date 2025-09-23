@@ -27,6 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// CreateMockWallet provisions a wallet in storage via the key generate
+// instruction and returns its existence proof, for tests purposes.
 func CreateMockWallet(
 	t *testing.T,
 	iSndD node.IdentifierSignerAndDecrypter,
@@ -97,6 +99,8 @@ func CreateMockWallet(
 	return *walletExistenceProof
 }
 
+// BuildMockPaymentOriginalMessage constructs a payment instruction payload for
+// use in tests.
 func BuildMockPaymentOriginalMessage(t *testing.T, mockWallet common.Hash, teeID common.Address, keyID uint64) []byte {
 	originalMessage := payment.ITeePaymentsPaymentInstructionMessage{
 		WalletId: mockWallet,
@@ -119,6 +123,8 @@ func BuildMockPaymentOriginalMessage(t *testing.T, mockWallet common.Hash, teeID
 	return originalMessageEncoded
 }
 
+// BuildMockInstructionAction assembles an instruction action with the provided
+// signing keys and payload for use in tests.
 func BuildMockInstructionAction(
 	opType op.Type,
 	opCommand op.Command,
@@ -228,6 +234,7 @@ func BuildMockInstructionAction(
 	return &action, nil
 }
 
+// BuildMockDirectAction fabricates a direct action with a random ID for tests.
 func BuildMockDirectAction(t *testing.T, opType op.Type, opCommand op.Command, messageRaw any) *types.Action {
 	var message []byte
 	var err error

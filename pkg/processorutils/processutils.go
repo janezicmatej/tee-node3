@@ -60,7 +60,7 @@ func Invalid(a *types.Action, err error) types.ActionResult {
 	}
 }
 
-// Invalid creates action result for invalid action.
+// DeadlineExceeded creates an action result indicating the extension timed out.
 func DeadlineExceeded(a *types.Action, err error) types.ActionResult {
 	return types.ActionResult{
 		ID:            a.Data.ID,
@@ -71,6 +71,7 @@ func DeadlineExceeded(a *types.Action, err error) types.ActionResult {
 	}
 }
 
+// CheckAndAdapt normalizes variable messages and validates associated arrays.
 func CheckAndAdapt(a *types.Action) error {
 	if len(a.AdditionalVariableMessages) == 0 {
 		a.AdditionalVariableMessages = make([]hexutil.Bytes, len(a.Signatures))
@@ -84,6 +85,7 @@ func CheckAndAdapt(a *types.Action) error {
 	return nil
 }
 
+// CheckMatchingCosigners ensures the provided cosigners align with stored data.
 func CheckMatchingCosigners(givenCosigners, cosigners []common.Address, givenThreshold, threshold uint64) error {
 	for _, cosigner := range givenCosigners {
 		if !slices.Contains(cosigners, cosigner) {

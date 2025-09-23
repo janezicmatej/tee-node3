@@ -23,6 +23,8 @@ type Processor struct {
 	node.Identifier
 }
 
+// NewProcessor creates a signing instruction processor backed by the provided
+// wallet storage and TEE identifier.
 func NewProcessor(identifier node.Identifier, wStorage *wallets.Storage) Processor {
 	return Processor{
 		Storage:    wStorage,
@@ -30,6 +32,8 @@ func NewProcessor(identifier node.Identifier, wStorage *wallets.Storage) Process
 	}
 }
 
+// SignXRPLPayment signs the XRP Ledger payment described in the instruction and
+// returns the JSON-encoded transaction containing the accumulated signatures.
 func (p *Processor) SignXRPLPayment(
 	_ types.SubmissionTag,
 	dataFixed *instruction.DataFixed,

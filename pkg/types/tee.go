@@ -25,6 +25,7 @@ type TeeInfo struct {
 	TeeTimestamp             uint64      `json:"teeTimestamp"`
 }
 
+// Hash encodes and hashes the TEE attestation payload.
 func (ti *TeeInfo) Hash() ([]byte, error) {
 	enc, err := structs.Encode(tee.StructArg[tee.Attestation], ti.prepareForEncoding())
 	if err != nil {
@@ -77,11 +78,15 @@ type SignedTeeInfoResponse struct {
 	ProxySignature hexutil.Bytes `json:"proxySignature"`
 }
 
+// EncodeTeeAttestationRequest serializes the attestation request using the
+// generated struct ABI.
 func EncodeTeeAttestationRequest(req *verification.ITeeVerificationTeeAttestation) (hexutil.Bytes, error) {
 	arg := verification.MessageArguments[op.TEEAttestation]
 	return structs.Encode(arg, &req)
 }
 
+// DecodeTeeAttestationRequest decodes the attestation request bytes into the
+// strongly typed struct.
 func DecodeTeeAttestationRequest(attReq []byte) (verification.ITeeVerificationTeeAttestation, error) {
 	arg := verification.MessageArguments[op.TEEAttestation]
 

@@ -21,6 +21,8 @@ import (
 const NormalizationConstant = 1000
 const DataProvidersThreshold = uint64(666)
 
+// BackupWallet packages the wallet state and encrypted key shares for admins
+// and providers so it can be reconstructed later.
 func BackupWallet(wallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, signingPolicyWeights []uint16, rewardEpochId uint32, teeID common.Address, normalizationParam uint16, dataProviderThreshold uint64) (*backup.WalletBackup, error) {
 	adminPubKeys := make([]types.PublicKey, len(wallet.AdminPublicKeys))
 	for i, pubKey := range wallet.AdminPublicKeys {
@@ -104,6 +106,8 @@ func weightsNormalization(weights []uint16, total uint16) []uint16 {
 	return normalizedWeights
 }
 
+// SplitAndEncrypt shards the provided private key, encrypts each share for its
+// owner, and returns the encoded share bundle.
 func SplitAndEncrypt(
 	key *ecdsa.PrivateKey,
 	encryptionPubKeys []*ecdsa.PublicKey,
@@ -173,6 +177,7 @@ func SplitAndEncrypt(
 	return &encryptedShares, nil
 }
 
+// RecoverWallet rebuilds a wallet from key shares and backup metadata.
 func RecoverWallet(
 	keyShares []*backup.KeySplit,
 	backupMetaData *backup.WalletBackupMetaData,
@@ -243,6 +248,8 @@ func RecoverWallet(
 	}, nil
 }
 
+// CheckKeyShares validates that the provided key shares belong to the expected
+// wallet backup metadata and originate from authorized parties.
 func CheckKeyShares(splits []*backup.KeySplit, backupMetaData *backup.WalletBackupMetaData) error {
 	if len(splits) == 0 {
 		return errors.New("shares should not be empty")
@@ -267,7 +274,8 @@ func CheckKeyShares(splits []*backup.KeySplit, backupMetaData *backup.WalletBack
 	return nil
 }
 
-// JoinKeyShares assumes that all the splits have the same backup id and the signatures have been verified.
+// JoinKeyShares joins key shares in a private key. It assumes that all the
+// splits have the same backup id and the signatures have been verified.
 func JoinKeyShares(splits []*backup.KeySplit, threshold uint64) (*ecdsa.PrivateKey, error) {
 	if threshold <= 0 {
 		return nil, errors.New("threshold should be positive")
