@@ -13,6 +13,7 @@ import (
 var P = secp256k1.S256().N
 var Zero = big.NewInt(0)
 
+// SplitToShamirShares generates Shamir secret shares for the provided value.
 func SplitToShamirShares(val *big.Int, numShares uint64, threshold uint64) ([]backup.ShamirShare, error) {
 	// Verify minimum isn't greater than shares; there is no way to recreate
 	// the original polynomial in our current setup, therefore it doesn't make

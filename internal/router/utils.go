@@ -23,10 +23,12 @@ func routID(a *types.Action) (rID, error) {
 	return id, err
 }
 
+// String returns the textual representation of the operation identifiers.
 func (i rID) String() string {
 	return string(op.HashToOPType(i.OPType)) + ", " + string(op.HashToOPCommand(i.OPCommand))
 }
 
+// SignResult signs the action result payload and returns an action response.
 func SignResult(ar *types.ActionResult, signer node.Signer) (*types.ActionResponse, error) {
 	res := &types.ActionResponse{
 		Result: *ar,

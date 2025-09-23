@@ -8,6 +8,8 @@ import (
 
 type Processor func(i *types.DirectInstruction) ([]byte, error)
 
+// Process parses the direct instruction and executes the wrapped processor
+// function, returning the action result payload.
 func (p Processor) Process(a *types.Action) types.ActionResult {
 	di, err := processorutils.Parse[types.DirectInstruction](a.Data.Message)
 	if err != nil {

@@ -22,6 +22,8 @@ type DummyExtensionServer struct {
 	version string
 }
 
+// NewDummyExtensionServer spins up a mock extension server that exercises the
+// TEE-node interface for local development.
 func NewDummyExtensionServer(port, teePort int) *DummyExtensionServer {
 	addr := fmt.Sprintf(":%d", port)
 
@@ -199,11 +201,13 @@ func (d *DummyExtensionServer) mockActionResult(action *types.Action) types.Acti
 	}
 }
 
+// Serve starts the dummy extension HTTP server.
 func (d *DummyExtensionServer) Serve() error {
 	logger.Infof("Starting dummy extension server on port %s", d.port)
 	return d.server.ListenAndServe()
 }
 
+// Close shuts down the dummy extension server.
 func (d *DummyExtensionServer) Close() error {
 	logger.Infof("Shutting down dummy extension server")
 	return d.server.Close()

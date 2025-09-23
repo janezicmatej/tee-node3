@@ -24,12 +24,13 @@ type Info struct {
 }
 
 type State interface {
-	// Encode ABI encodes the state
+	// State encodes the node state into its serialized representation.
 	State() (types.TeeState, error)
 }
 
 type ZeroState struct{}
 
+// State returns the zero-value node state.
 func (ZeroState) State() (types.TeeState, error) {
 	return types.TeeState{
 		SystemState:        hexutil.Bytes{},
@@ -55,11 +56,12 @@ func Initialize(state State) (*Node, error) {
 	}, nil
 }
 
+// State retrieves the current serialized node state.
 func (n *Node) State() (types.TeeState, error) {
 	return n.state.State()
 }
 
-// Info return node's info.
+// Info returns the node metadata and current state.
 func (n *Node) Info() Info {
 	return Info{
 		TeeID:     n.teeID,
@@ -73,10 +75,12 @@ func (n *Node) TeeID() common.Address {
 	return n.teeID
 }
 
+// Sign signs the hash with the node's private key.
 func (n *Node) Sign(msgHash []byte) ([]byte, error) {
 	return utils.Sign(msgHash, n.privateKey)
 }
 
+// Decrypt decrypts the ciphertext with the node's private key.
 func (n *Node) Decrypt(cipher []byte) ([]byte, error) {
 	privKeyDecryption := ecies.ImportECDSA(n.privateKey)
 	plaintext, err := privKeyDecryption.Decrypt(cipher, nil, nil)

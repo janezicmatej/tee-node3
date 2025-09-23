@@ -40,6 +40,7 @@ type WalletStatus struct {
 	StatusCode   uint8
 }
 
+// GenerateNewKey creates a wallet from the key generate instruction payload.
 func GenerateNewKey(kg wallet.ITeeWalletKeyManagerKeyGenerate) (*Wallet, error) {
 	sk, err := crypto.GenerateKey()
 	if err != nil {
@@ -71,6 +72,7 @@ func GenerateNewKey(kg wallet.ITeeWalletKeyManagerKeyGenerate) (*Wallet, error) 
 	return newWallet, nil
 }
 
+// CopyWallet returns a deep copy of the wallet structure.
 func CopyWallet(inputWallet *Wallet) *Wallet {
 	walletCopy := &Wallet{
 		WalletID:        inputWallet.WalletID,
@@ -100,6 +102,8 @@ func CopyWallet(inputWallet *Wallet) *Wallet {
 	return walletCopy
 }
 
+// WalletToKeyExistenceProof builds a key existence proof for the supplied
+// wallet.
 func WalletToKeyExistenceProof(inputWallet *Wallet, teeID common.Address) *wallet.ITeeWalletKeyManagerKeyExistence {
 	adminPubKeys := make([]wallet.PublicKey, len(inputWallet.AdminPublicKeys))
 	for i, pubKey := range inputWallet.AdminPublicKeys {
@@ -133,6 +137,8 @@ func WalletToKeyExistenceProof(inputWallet *Wallet, teeID common.Address) *walle
 	}
 }
 
+// ExternalAddress returns the user-facing address representation for the
+// wallet key based on the operation type.
 func ExternalAddress(opType common.Hash, pk *ecdsa.PrivateKey) string {
 	t := op.HashToOPType(opType)
 	if t == op.XRP {

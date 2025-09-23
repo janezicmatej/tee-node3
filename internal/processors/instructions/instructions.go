@@ -20,6 +20,8 @@ import (
 
 type ProcessorFunction func(submissionTag types.SubmissionTag, dataFixed *instruction.DataFixed, variableMessages []hexutil.Bytes, signers []common.Address, signingPolicy *cpolicy.SigningPolicy) ([]byte, []byte, error)
 
+// NewProcessor builds a Processor that wraps the provided instruction handler
+// with common preprocessing and validation logic.
 func NewProcessor(f ProcessorFunction, iSAndD node.IdentifierSignerAndDecrypter, pStorage *policy.Storage) Processor {
 	return Processor{
 		f:        f,
@@ -34,6 +36,8 @@ type Processor struct {
 	pStorage *policy.Storage
 }
 
+// Process validates an instruction action and routes it through the configured
+// instruction handler, packaging the result for the router.
 func (p Processor) Process(a *types.Action) types.ActionResult {
 	data, err := processorutils.Parse[instruction.DataFixed](a.Data.Message)
 	if err != nil {

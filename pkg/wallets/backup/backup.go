@@ -20,6 +20,7 @@ type WalletBackup struct {
 	AdminEncryptedParts    *EncryptedShares
 	ProviderEncryptedParts *EncryptedShares
 	Signature              []byte
+	TEESignature           []byte
 }
 
 type WalletBackupMetaData struct {
@@ -46,6 +47,7 @@ type ShamirShare struct {
 	Y *big.Int
 }
 
+// ID returns the string identifier for the Shamir share.
 func (s *ShamirShare) ID() string {
 	return s.X.String()
 }
@@ -67,6 +69,7 @@ type PartialWalletBackupID struct {
 	IsAdmin       bool
 }
 
+// HashForSigning computes the hash used when signing the key split data.
 func (ksd *KeySplitData) HashForSigning() (common.Hash, error) {
 	keyDataBytes, err := json.Marshal(ksd)
 	if err != nil {
@@ -77,6 +80,7 @@ func (ksd *KeySplitData) HashForSigning() (common.Hash, error) {
 	return hash, nil
 }
 
+// Sign signs the key split data with the provided private key.
 func (ksd *KeySplitData) Sign(privKey *ecdsa.PrivateKey) ([]byte, error) {
 	hash, err := ksd.HashForSigning()
 	if err != nil {
@@ -91,6 +95,7 @@ func (ksd *KeySplitData) Sign(privKey *ecdsa.PrivateKey) ([]byte, error) {
 	return signature, nil
 }
 
+// VerifySignature checks that the key split signature matches the owner key.
 func (ks *KeySplit) VerifySignature() error {
 	hash, err := ks.HashForSigning()
 	if err != nil {
@@ -108,6 +113,7 @@ func (ks *KeySplit) VerifySignature() error {
 	return err
 }
 
+// HashForSigning produces the hash over the wallet backup content.
 func (wb *WalletBackup) HashForSigning() (common.Hash, error) {
 	type WalletBackupForHashing struct {
 		WalletBackupMetaData
@@ -128,6 +134,7 @@ func (wb *WalletBackup) HashForSigning() (common.Hash, error) {
 	return hash, nil
 }
 
+// Check validates the metadata and share alignment in the wallet backup.
 func (wb *WalletBackup) Check() error {
 	err := wb.AdminEncryptedParts.Check()
 	if err != nil {
@@ -159,6 +166,8 @@ func (wb *WalletBackup) Check() error {
 	return nil
 }
 
+// Check ensures the encrypted shares meet threshold and weighting
+// requirements.
 func (e *EncryptedShares) Check() error {
 	if len(e.Splits) != len(e.OwnersPublicKeys) {
 		return errors.New("the number of splits does not match the number of public keys")
@@ -173,6 +182,7 @@ func (e *EncryptedShares) Check() error {
 	return nil
 }
 
+// DecryptSplit decrypts an encrypted key split and verifies its integrity.
 func DecryptSplit(encryptedShare []byte, privKeyECDSA *ecdsa.PrivateKey) (*KeySplit, error) {
 	privKeyDecryption := ecies.ImportECDSA(privKeyECDSA)
 	shareBytes, err := privKeyDecryption.Decrypt(encryptedShare, nil, nil)

@@ -15,6 +15,7 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
+// ParseKeyGenerate decodes the key generation instruction payload.
 func ParseKeyGenerate(instructionData *instruction.DataFixed) (wallet.ITeeWalletKeyManagerKeyGenerate, error) {
 	arg := wallet.MessageArguments[op.KeyGenerate]
 
@@ -27,6 +28,7 @@ func ParseKeyGenerate(instructionData *instruction.DataFixed) (wallet.ITeeWallet
 	return unpacked, nil
 }
 
+// CheckKeyGenerate performs basic validation on the key generation request.
 func CheckKeyGenerate(newWalletRequest wallet.ITeeWalletKeyManagerKeyGenerate) error {
 	if len(newWalletRequest.ConfigConstants.AdminsPublicKeys) == 0 {
 		return errors.New("no admin public keys")
@@ -35,6 +37,7 @@ func CheckKeyGenerate(newWalletRequest wallet.ITeeWalletKeyManagerKeyGenerate) e
 	return nil
 }
 
+// ParseKeyDelete decodes the key deletion instruction payload.
 func ParseKeyDelete(instructionData *instruction.DataFixed) (wallet.ITeeWalletKeyManagerKeyDelete, error) {
 	arg := wallet.MessageArguments[op.KeyDelete]
 	var unpacked wallet.ITeeWalletKeyManagerKeyDelete
@@ -50,6 +53,7 @@ func ParseKeyDelete(instructionData *instruction.DataFixed) (wallet.ITeeWalletKe
 	return unpacked, nil
 }
 
+// ParseKeyDataProviderRestore decodes the key data provider restore payload.
 func ParseKeyDataProviderRestore(instructionData *instruction.DataFixed) (wallet.ITeeWalletBackupManagerKeyDataProviderRestore, error) {
 	arg := wallet.MessageArguments[op.KeyDataProviderRestore]
 	var unpacked wallet.ITeeWalletBackupManagerKeyDataProviderRestore
@@ -98,6 +102,7 @@ type WalletBackupID struct {
 	RandomNonce   common.Hash `json:"randomNonce"`
 }
 
+// Hash returns the keccak hash of the wallet backup identifier.
 func (wid *WalletBackupID) Hash() common.Hash {
 	backupIdBytes, _ := json.Marshal(wid) //nolint:errchkjson // passed argument is safe
 	hash := crypto.Keccak256Hash(backupIdBytes)
@@ -110,6 +115,7 @@ type SignedKeyExistenceProof struct {
 	Signature    hexutil.Bytes `json:"signature"`
 }
 
+// ExtractKeyExistence parses a signed existence proof from bytes.
 func ExtractKeyExistence(b []byte) (*wallet.ITeeWalletKeyManagerKeyExistence, error) {
 	var wskep SignedKeyExistenceProof
 

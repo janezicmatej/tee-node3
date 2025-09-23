@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// GenerateRandom returns a cryptographically secure 32-byte random value.
 func GenerateRandom() ([32]byte, error) {
 	b := make([]byte, 32)
 	n, err := io.ReadFull(rand.Reader, b)
@@ -32,6 +33,7 @@ func GenerateRandom() ([32]byte, error) {
 	return r, nil
 }
 
+// Sign signs the provided hash with the given private key.
 func Sign(msgHash []byte, privKey *ecdsa.PrivateKey) ([]byte, error) {
 	if len(msgHash) != 32 {
 		return nil, fmt.Errorf("invalid message hash length")
@@ -44,6 +46,8 @@ func Sign(msgHash []byte, privKey *ecdsa.PrivateKey) ([]byte, error) {
 	return sig, nil
 }
 
+// CheckSignature recovers the signer address and optionally verifies it is in
+// the allowed voter list.
 func CheckSignature(hash, signature []byte, voters []common.Address) (common.Address, error) {
 	address, err := SignatureToSignersAddress(hash, signature)
 	if err != nil {
@@ -56,6 +60,7 @@ func CheckSignature(hash, signature []byte, voters []common.Address) (common.Add
 	return address, nil
 }
 
+// VerifySignature ensures the signature matches the expected signer.
 func VerifySignature(hash, signature []byte, signerAddress common.Address) error {
 	address, err := SignatureToSignersAddress(hash, signature)
 	if err != nil {
@@ -68,6 +73,8 @@ func VerifySignature(hash, signature []byte, signerAddress common.Address) error
 	return nil
 }
 
+// SignatureToSignersAddress recovers the Ethereum address associated with the
+// signature of the given hash.
 func SignatureToSignersAddress(hash, signature []byte) (common.Address, error) {
 	pubKey, err := crypto.SigToPub(accounts.TextHash(hash), signature)
 	if err != nil {
@@ -78,6 +85,7 @@ func SignatureToSignersAddress(hash, signature []byte) (common.Address, error) {
 	return address, nil
 }
 
+// ParsePubKeys converts the wallet public key structures to ECDSA keys.
 func ParsePubKeys(pubKeys []wallet.PublicKey) ([]*ecdsa.PublicKey, error) {
 	parsedPubKeys := make([]*ecdsa.PublicKey, len(pubKeys))
 	var err error
@@ -94,6 +102,7 @@ func ParsePubKeys(pubKeys []wallet.PublicKey) ([]*ecdsa.PublicKey, error) {
 	return parsedPubKeys, nil
 }
 
+// PubKeysToAddresses returns the Ethereum addresses derived from the keys.
 func PubKeysToAddresses(pubKeys []types.PublicKey) ([]common.Address, error) {
 	addresses := make([]common.Address, len(pubKeys))
 	for i, pubKey := range pubKeys {

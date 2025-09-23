@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Setup provisions a test node and fresh storages for integration-style tests.
 func Setup(t *testing.T) (*node.Node, *policy.Storage, *wallets.Storage) {
 	node, err := node.Initialize(node.ZeroState{})
 	require.NoError(t, err)

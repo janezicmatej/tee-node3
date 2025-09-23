@@ -42,6 +42,8 @@ type ExtensionServer struct {
 	proxyUrl *settings.ProxyURLMutex
 }
 
+// NewExtensionServer constructs an HTTP server that exposes wallet and TEE
+// functionality to extension clients on the provided port.
 func NewExtensionServer(port int, node *node.Node, wStorage *wallets.Storage, proxyUrl *settings.ProxyURLMutex) *ExtensionServer {
 	addr := fmt.Sprintf(":%d", port)
 
@@ -352,6 +354,8 @@ func (s *ExtensionServer) decryptWithTeeHandler(w http.ResponseWriter, r *http.R
 	}
 }
 
+// Encrypt wraps the ECIES encryption helper for plaintext using the provided
+// public key.
 func Encrypt(plaintext []byte, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	pk := ecies.ImportECDSAPublic(publicKey)
 	privKeyEncryption, err := ecies.Encrypt(rand.Reader, pk, plaintext, nil, nil)
@@ -362,6 +366,7 @@ func Encrypt(plaintext []byte, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	return privKeyEncryption, nil
 }
 
+// Decrypt decrypts an ECIES encrypted message using the supplied private key.
 func Decrypt(cipher []byte, privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	privKeyDecryption := ecies.ImportECDSA(privateKey)
 	plaintext, err := privKeyDecryption.Decrypt(cipher, nil, nil)

@@ -20,6 +20,8 @@ type DefaultProcessor struct {
 	iSAndD        node.IdentifierSignerAndDecrypter
 }
 
+// NewDefaultProcessor creates a processor that forwards instruction actions to
+// the configured extension endpoint.
 func NewDefaultProcessor(port int, policyStorage *policy.Storage, iSAndD node.IdentifierSignerAndDecrypter) DefaultProcessor {
 	return DefaultProcessor{
 		extensionPort: port,
@@ -28,6 +30,8 @@ func NewDefaultProcessor(port int, policyStorage *policy.Storage, iSAndD node.Id
 	}
 }
 
+// Process routes the instruction action to the external extension at threshold
+// and crafts the final vote response when the action ends.
 func (p DefaultProcessor) Process(a *types.Action) types.ActionResult {
 	data, err := processorutils.Parse[instruction.DataFixed](a.Data.Message)
 	if err != nil {

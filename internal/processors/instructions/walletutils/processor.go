@@ -24,6 +24,8 @@ type Processor struct {
 	node.IdentifierSignerAndDecrypter
 }
 
+// NewProcessor constructs the wallet utility processor with the storages and
+// TEE capabilities it relies on.
 func NewProcessor(iSAndD node.IdentifierSignerAndDecrypter, policyStorage *policy.Storage, walletsStorage *wallets.Storage) Processor {
 	return Processor{
 		pStorage:                     policyStorage,
@@ -32,6 +34,8 @@ func NewProcessor(iSAndD node.IdentifierSignerAndDecrypter, policyStorage *polic
 	}
 }
 
+// KeyGenerate handles wallet key creation instructions, persisting the new key
+// and returning a signed existence proof.
 func (p *Processor) KeyGenerate(
 	submissionTag types.SubmissionTag,
 	dataFixed *instruction.DataFixed,
@@ -90,6 +94,8 @@ func (p *Processor) KeyGenerate(
 	return resultEncoded, nil, nil
 }
 
+// KeyDelete processes key removal instructions and enforces nonce-based replay
+// protection.
 func (p *Processor) KeyDelete(
 	submissionTag types.SubmissionTag,
 	dataFixed *instruction.DataFixed,
@@ -127,6 +133,8 @@ func (p *Processor) KeyDelete(
 	return nil, nil, nil
 }
 
+// KeyDataProviderRestore reconstructs a wallet key from provider shares and
+// emits a signed existence proof when successful.
 func (p *Processor) KeyDataProviderRestore(
 	submissionTag types.SubmissionTag,
 	dataFixed *instruction.DataFixed,
