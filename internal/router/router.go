@@ -82,7 +82,7 @@ func (r *Router) ServeQueue(id processorutils.QueueID, signer node.Signer) {
 		result = r.process(action, id)
 		logger.Infof("%s queue: result obtained: status %v, log %v", id, result.Status, result.Log)
 
-		response, _ = SignResult(&result, signer)
+		response, err = SignResult(&result, signer)
 		if err != nil {
 			logger.Errorf("%s queue: error signing: %v", id, err)
 		}

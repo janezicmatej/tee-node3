@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"slices"
 
 	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/utils"
@@ -38,7 +39,7 @@ type EncryptedShares struct {
 	Splits           []hexutil.Bytes
 	OwnersPublicKeys []types.PublicKey
 	Threshold        uint64
-	PublicKey        types.PublicKey
+	PublicKey        hexutil.Bytes
 	Weights          []uint16
 }
 
@@ -65,8 +66,14 @@ type KeySplitData struct {
 
 type PartialWalletBackupID struct {
 	wallets.WalletBackupID
-	PartialPubKey types.PublicKey
+	PartialPubKey hexutil.Bytes
 	IsAdmin       bool
+}
+
+func (pwid *PartialWalletBackupID) Equal(w *PartialWalletBackupID) bool {
+	return pwid.WalletBackupID.Equal(&w.WalletBackupID) &&
+		slices.Compare(pwid.PartialPubKey, w.PartialPubKey) == 0 &&
+		pwid.IsAdmin == w.IsAdmin
 }
 
 // HashForSigning computes the hash used when signing the key split data.
@@ -102,7 +109,7 @@ func (ks *KeySplit) VerifySignature() error {
 		return err
 	}
 
-	pubKeyParsed, err := types.ParsePubKey(ks.PublicKey)
+	pubKeyParsed, err := types.ParsePubKeyBytes(ks.PublicKey)
 	if err != nil {
 		return err
 	}

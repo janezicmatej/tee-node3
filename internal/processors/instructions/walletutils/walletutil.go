@@ -50,7 +50,7 @@ func (p *Processor) keyDataProviderRestoreCheck(
 	if err != nil {
 		return nil, 0, nil, err
 	}
-	if backupMetadata.WalletBackupID != backupID {
+	if !backupMetadata.WalletBackupID.Equal(&backupID) { //nolint:staticcheck // to avoid confusion we do not call backupMetadata.Equal
 		return nil, 0, nil, errors.New("wallet backup id in the metadata does not match the given id")
 	}
 	adminAddresses, err := utils.PubKeysToAddresses(backupMetadata.AdminsPublicKeys)
@@ -142,7 +142,7 @@ func processKeySplitMessage(keySplitsPlaintext []byte, walletBackupId wallets.Wa
 	}
 
 	for _, keySplit := range keySplits {
-		if keySplit.WalletBackupID != walletBackupId {
+		if !keySplit.WalletBackupID.Equal(&walletBackupId) {
 			return nil, errors.New("wallet backup id in the share does not match the id in the key split")
 		}
 
@@ -190,8 +190,8 @@ func checkSigners(signers []common.Address, expectedProviders []common.Address, 
 }
 
 func backupRequestToID(req *wallet.ITeeWalletBackupManagerKeyDataProviderRestore) (wallets.WalletBackupID, error) {
-	if req.BackupId.RewardEpochId == nil {
-		return wallets.WalletBackupID{}, errors.New("reward epoch not given")
+	if len(req.BackupId.PublicKey) != 64 {
+		return wallets.WalletBackupID{}, errors.New("unsupported public key format")
 	}
 
 	backupID := wallets.WalletBackupID{
@@ -200,21 +200,10 @@ func backupRequestToID(req *wallet.ITeeWalletBackupManagerKeyDataProviderRestore
 		KeyID:         req.BackupId.KeyId,
 		KeyType:       req.BackupId.KeyType,
 		SigningAlgo:   req.BackupId.SigningAlgo,
-		RewardEpochID: uint32(req.BackupId.RewardEpochId.Uint64()),
-		RandomNonce:   common.Hash{},
+		PublicKey:     req.BackupId.PublicKey,
+		RewardEpochID: req.BackupId.RewardEpochId,
+		RandomNonce:   req.BackupId.RandomNonce,
 	}
-	if len(req.BackupId.PublicKey) != 64 {
-		return wallets.WalletBackupID{}, errors.New("unsupported public key format")
-	}
-	copy(backupID.PublicKey.X[:], req.BackupId.PublicKey[:32])
-	copy(backupID.PublicKey.Y[:], req.BackupId.PublicKey[32:])
-
-	randomNonce := req.BackupId.RandomNonce.Bytes()
-	if len(randomNonce) > 32 {
-		return wallets.WalletBackupID{}, errors.New("random nonce too big")
-	}
-	randomNonce = append(make([]byte, 32-len(randomNonce), 32), randomNonce...)
-	copy(backupID.RandomNonce[:], randomNonce)
 
 	return backupID, nil
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
-	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/utils"
 )
 
@@ -107,10 +106,10 @@ type TEEBackupResponse struct {
 }
 
 type WalletBackupID struct {
-	TeeID     common.Address  `json:"teeId"`
-	WalletID  common.Hash     `json:"walletId"`
-	KeyID     uint64          `json:"keyId"`
-	PublicKey types.PublicKey `json:"publicKey"`
+	TeeID     common.Address `json:"teeId"`
+	WalletID  common.Hash    `json:"walletId"`
+	KeyID     uint64         `json:"keyId"`
+	PublicKey hexutil.Bytes  `json:"publicKey"`
 
 	KeyType       common.Hash `json:"keyType"`
 	SigningAlgo   common.Hash `json:"signingAlgo"`
@@ -118,9 +117,35 @@ type WalletBackupID struct {
 	RandomNonce   common.Hash `json:"randomNonce"`
 }
 
+func (wid *WalletBackupID) Equal(w *WalletBackupID) bool {
+	return wid.TeeID == w.TeeID &&
+		wid.WalletID == w.WalletID &&
+		wid.KeyID == w.KeyID &&
+		slices.Compare(wid.PublicKey, w.PublicKey) == 0 &&
+		wid.KeyType == w.KeyType &&
+		wid.SigningAlgo == w.SigningAlgo &&
+		wid.RewardEpochID == w.RewardEpochID &&
+		wid.RandomNonce == w.RandomNonce
+}
+
+func (wid *WalletBackupID) prepareForEncoding() ([]byte, error) {
+	sStruct := wallet.ITeeWalletBackupManagerBackupId{
+		TeeId:         wid.TeeID,
+		WalletId:      wid.WalletID,
+		KeyId:         wid.KeyID,
+		KeyType:       wid.KeyType,
+		SigningAlgo:   wid.SigningAlgo,
+		PublicKey:     wid.PublicKey,
+		RewardEpochId: wid.RewardEpochID,
+		RandomNonce:   wid.RandomNonce,
+	}
+
+	return structs.Encode(wallet.BackupIdStructArg, sStruct)
+}
+
 // Hash returns the keccak hash of the wallet backup identifier.
 func (wid *WalletBackupID) Hash() common.Hash {
-	backupIdBytes, _ := json.Marshal(wid) //nolint:errchkjson // passed argument is safe
+	backupIdBytes, _ := wid.prepareForEncoding()
 	hash := crypto.Keccak256Hash(backupIdBytes)
 
 	return hash
