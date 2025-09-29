@@ -117,18 +117,14 @@ type WalletBackupID struct {
 	RandomNonce   common.Hash `json:"randomNonce"`
 }
 
+// Equal checks if two wallet backup identifiers are equal.
+// Will silently fail if either PublicKey is (absurdly) too large. The length should be checked beforehand.
 func (wid *WalletBackupID) Equal(w *WalletBackupID) bool {
-	return wid.TeeID == w.TeeID &&
-		wid.WalletID == w.WalletID &&
-		wid.KeyID == w.KeyID &&
-		slices.Compare(wid.PublicKey, w.PublicKey) == 0 &&
-		wid.KeyType == w.KeyType &&
-		wid.SigningAlgo == w.SigningAlgo &&
-		wid.RewardEpochID == w.RewardEpochID &&
-		wid.RandomNonce == w.RandomNonce
+	return slices.Equal(wid.encodeABI(), w.encodeABI())
 }
 
-func (wid *WalletBackupID) prepareForEncoding() ([]byte, error) {
+// encodeABI prepares the wallet backup identifier for encoding.
+func (wid *WalletBackupID) encodeABI() []byte {
 	sStruct := wallet.ITeeWalletBackupManagerBackupId{
 		TeeId:         wid.TeeID,
 		WalletId:      wid.WalletID,
@@ -140,12 +136,15 @@ func (wid *WalletBackupID) prepareForEncoding() ([]byte, error) {
 		RandomNonce:   wid.RandomNonce,
 	}
 
-	return structs.Encode(wallet.BackupIdStructArg, sStruct)
+	enc, _ := structs.Encode(wallet.BackupIdStructArg, sStruct)
+	return enc
 }
 
 // Hash returns the keccak hash of the wallet backup identifier.
+// Will silently fail if the PublicKey is (absurdly) too large. The length should be checked beforehand.
 func (wid *WalletBackupID) Hash() common.Hash {
-	backupIdBytes, _ := wid.prepareForEncoding()
+	backupIdBytes := wid.encodeABI()
+
 	hash := crypto.Keccak256Hash(backupIdBytes)
 
 	return hash

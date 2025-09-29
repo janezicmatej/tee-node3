@@ -96,14 +96,12 @@ func TestBackupID(t *testing.T) {
 	})
 
 	t.Run("encoding + hash", func(t *testing.T) {
-		_, err := bI0.prepareForEncoding()
-		require.NoError(t, err)
-
-		_, err = zeroBI.prepareForEncoding()
-		require.NoError(t, err)
-
 		h0 := zeroBI.Hash()
+		require.NoError(t, err)
+
 		h1 := bI0.Hash()
+		require.NoError(t, err)
+
 		require.NotEqual(t, h0, h1)
 	})
 }
