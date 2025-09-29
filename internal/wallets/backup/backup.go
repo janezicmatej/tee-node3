@@ -41,7 +41,7 @@ func BackupWallet(wallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, si
 			TeeID:         teeID,
 			WalletID:      wallet.WalletID,
 			KeyID:         wallet.KeyID,
-			PublicKey:     types.PubKeyToStruct(&wallet.PrivateKey.PublicKey),
+			PublicKey:     types.PubKeyToBytes(&wallet.PrivateKey.PublicKey),
 			KeyType:       wallet.KeyType,
 			SigningAlgo:   wallet.SigningAlgo,
 			RewardEpochID: rewardEpochId,
@@ -132,7 +132,7 @@ func SplitAndEncrypt(
 		Splits:           make([]hexutil.Bytes, numSplits),
 		OwnersPublicKeys: encryptionPubKeysApi,
 		Threshold:        threshold,
-		PublicKey:        types.PubKeyToStruct(&key.PublicKey),
+		PublicKey:        types.PubKeyToBytes(&key.PublicKey),
 		Weights:          make([]uint16, numSplits),
 	}
 	copy(encryptedShares.Weights, weights)
@@ -216,7 +216,7 @@ func RecoverWallet(
 		return nil, err
 	}
 
-	if types.PubKeyToStruct(&key.PublicKey) != backupMetaData.PublicKey {
+	if slices.Compare(types.PubKeyToBytes(&key.PublicKey), backupMetaData.PublicKey) != 0 {
 		return nil, errors.New("private key reconstruction error: final result does not match address")
 	}
 
@@ -257,7 +257,7 @@ func CheckKeyShares(splits []*backup.KeySplit, backupMetaData *backup.WalletBack
 	}
 	partialBackupId := splits[0].PartialWalletBackupID
 	for _, split := range splits {
-		if split.PartialWalletBackupID != partialBackupId {
+		if !split.PartialWalletBackupID.Equal(&partialBackupId) { //nolint:staticcheck // to avoid confusion we do not call split.Equal
 			return errors.New("one of key split's ids does not match expected id")
 		}
 
@@ -268,7 +268,7 @@ func CheckKeyShares(splits []*backup.KeySplit, backupMetaData *backup.WalletBack
 		}
 	}
 
-	if partialBackupId.WalletBackupID != backupMetaData.WalletBackupID {
+	if !partialBackupId.WalletBackupID.Equal(&backupMetaData.WalletBackupID) {
 		return errors.New("backup metadata's id does not match expected id")
 	}
 
@@ -298,7 +298,7 @@ func JoinKeyShares(splits []*backup.KeySplit, threshold uint64) (*ecdsa.PrivateK
 	}
 	privateKey := crypto.ToECDSAUnsafe(privateKeyBigInt.Bytes())
 	expectedPartialPublicKey := splits[0].PartialPubKey // at this point splits is checked to not be empty
-	if types.PubKeyToStruct(&privateKey.PublicKey) != expectedPartialPublicKey {
+	if !slices.Equal(types.PubKeyToBytes(&privateKey.PublicKey), expectedPartialPublicKey) {
 		return nil, err
 	}
 

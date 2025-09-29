@@ -20,6 +20,22 @@ func ParsePubKey(key PublicKey) (*ecdsa.PublicKey, error) {
 	return &ecdsa.PublicKey{Curve: secp256k1.S256(), X: x, Y: y}, nil
 }
 
+// ParsePubKeyBytes converts key that consists of concatenated X and Y coordinates into an ECDSA public key.
+// Key is [X||Y] where X and Y are 32 bytes each.
+func ParsePubKeyBytes(key []byte) (*ecdsa.PublicKey, error) {
+	if len(key) != 64 {
+		return nil, errors.New("invalid public key should be 64 bytes long")
+	}
+	x := new(big.Int).SetBytes(key[:32])
+	y := new(big.Int).SetBytes(key[32:64])
+	check := secp256k1.S256().IsOnCurve(x, y)
+	if !check {
+		return nil, errors.New("coordinates not on curve")
+	}
+
+	return &ecdsa.PublicKey{Curve: secp256k1.S256(), X: x, Y: y}, nil
+}
+
 // PubKeyToStruct converts an ECDSA public key into the fixed-size struct form.
 func PubKeyToStruct(key *ecdsa.PublicKey) PublicKey {
 	var newKey PublicKey

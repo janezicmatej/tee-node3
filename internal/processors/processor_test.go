@@ -399,7 +399,7 @@ func getBackup(t *testing.T, actionInfoChan chan *types.Action,
 	err = utils.VerifySignature(backupHash[:], backup.TEESignature, teeId)
 	require.NoError(t, err)
 
-	backupPubKey, err := types.ParsePubKey(backup.PublicKey)
+	backupPubKey, err := types.ParsePubKeyBytes(backup.PublicKey)
 	require.NoError(t, err)
 	err = utils.VerifySignature(backupHash[:], backup.Signature, crypto.PubkeyToAddress(*backupPubKey))
 	require.NoError(t, err)
@@ -423,9 +423,9 @@ func recoverWallet(t *testing.T, actionInfoChan chan *types.Action,
 			KeyId:         keyId,
 			KeyType:       wallets.XRPType,
 			SigningAlgo:   wallets.XRPAlgo,
-			PublicKey:     append(walletBackup.PublicKey.X[:], walletBackup.PublicKey.Y[:]...),
-			RewardEpochId: big.NewInt(int64(rewardEpochId)),
-			RandomNonce:   new(big.Int).SetBytes(walletBackup.RandomNonce[:]),
+			PublicKey:     walletBackup.PublicKey,
+			RewardEpochId: rewardEpochId,
+			RandomNonce:   walletBackup.RandomNonce,
 		},
 	}
 

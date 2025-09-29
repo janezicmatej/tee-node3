@@ -243,9 +243,6 @@ func TestKeyDataProviderRestore(t *testing.T) {
 	require.NoError(t, err)
 
 	backupID := walletBackup.WalletBackupID
-	pubKeyBytes := make([]byte, 64)
-	copy(pubKeyBytes[:32], backupID.PublicKey.X[:])
-	copy(pubKeyBytes[32:], backupID.PublicKey.Y[:])
 
 	restoreReq := cwallet.ITeeWalletBackupManagerKeyDataProviderRestore{
 		TeePublicKey: cwallet.PublicKey{X: testNode.Info().PublicKey.X, Y: testNode.Info().PublicKey.Y},
@@ -255,9 +252,9 @@ func TestKeyDataProviderRestore(t *testing.T) {
 			KeyId:         backupID.KeyID,
 			KeyType:       [32]byte(backupID.KeyType),
 			SigningAlgo:   [32]byte(backupID.SigningAlgo),
-			PublicKey:     pubKeyBytes,
-			RewardEpochId: new(big.Int).SetUint64(uint64(backupID.RewardEpochID)),
-			RandomNonce:   new(big.Int).SetBytes(backupID.RandomNonce[:]),
+			PublicKey:     backupID.PublicKey,
+			RewardEpochId: backupID.RewardEpochID,
+			RandomNonce:   backupID.RandomNonce,
 		},
 		BackupUrl: "https://example.com/backup",
 		Nonce:     big.NewInt(2),

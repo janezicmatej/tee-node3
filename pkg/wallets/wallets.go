@@ -13,7 +13,6 @@ import (
 	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
-	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/utils"
 )
 
@@ -89,7 +88,7 @@ func nonceCheck(nonce *big.Int) error {
 	if nonce == nil {
 		return errors.New("nonce not given")
 	}
-	if nonce.BitLen() > 64 {
+	if nonce.BitLen() > 256 {
 		return errors.New("nonce too big")
 	}
 
@@ -107,10 +106,10 @@ type TEEBackupResponse struct {
 }
 
 type WalletBackupID struct {
-	TeeID     common.Address  `json:"teeId"`
-	WalletID  common.Hash     `json:"walletId"`
-	KeyID     uint64          `json:"keyId"`
-	PublicKey types.PublicKey `json:"publicKey"`
+	TeeID     common.Address `json:"teeId"`
+	WalletID  common.Hash    `json:"walletId"`
+	KeyID     uint64         `json:"keyId"`
+	PublicKey hexutil.Bytes  `json:"publicKey"`
 
 	KeyType       common.Hash `json:"keyType"`
 	SigningAlgo   common.Hash `json:"signingAlgo"`
@@ -118,9 +117,34 @@ type WalletBackupID struct {
 	RandomNonce   common.Hash `json:"randomNonce"`
 }
 
+// Equal checks if two wallet backup identifiers are equal.
+// Will silently fail if either PublicKey is (absurdly) too large. The length should be checked beforehand.
+func (wid *WalletBackupID) Equal(w *WalletBackupID) bool {
+	return slices.Equal(wid.encodeABI(), w.encodeABI())
+}
+
+// encodeABI prepares the wallet backup identifier for encoding.
+func (wid *WalletBackupID) encodeABI() []byte {
+	sStruct := wallet.ITeeWalletBackupManagerBackupId{
+		TeeId:         wid.TeeID,
+		WalletId:      wid.WalletID,
+		KeyId:         wid.KeyID,
+		KeyType:       wid.KeyType,
+		SigningAlgo:   wid.SigningAlgo,
+		PublicKey:     wid.PublicKey,
+		RewardEpochId: wid.RewardEpochID,
+		RandomNonce:   wid.RandomNonce,
+	}
+
+	enc, _ := structs.Encode(wallet.BackupIdStructArg, sStruct)
+	return enc
+}
+
 // Hash returns the keccak hash of the wallet backup identifier.
+// Will silently fail if the PublicKey is (absurdly) too large. The length should be checked beforehand.
 func (wid *WalletBackupID) Hash() common.Hash {
-	backupIdBytes, _ := json.Marshal(wid) //nolint:errchkjson // passed argument is safe
+	backupIdBytes := wid.encodeABI()
+
 	hash := crypto.Keccak256Hash(backupIdBytes)
 
 	return hash
