@@ -200,7 +200,7 @@ func backupRequestToID(req *wallet.ITeeWalletBackupManagerKeyDataProviderRestore
 		KeyID:         req.BackupId.KeyId,
 		KeyType:       req.BackupId.KeyType,
 		SigningAlgo:   req.BackupId.SigningAlgo,
-		PublicKey:     req.BackupId.PublicKey,
+		PublicKey:     append(make([]byte, 0, len(req.BackupId.PublicKey)), req.BackupId.PublicKey...),
 		RewardEpochID: req.BackupId.RewardEpochId,
 		RandomNonce:   req.BackupId.RandomNonce,
 	}
