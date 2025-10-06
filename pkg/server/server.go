@@ -64,5 +64,5 @@ func StartServerExtension(setProxyPort, serverPort, extensionPort int) {
 func StartExampleExtension(serverPort, extensionPort int) {
 	server := exampleextension.NewDummyExtensionServer(extensionPort, serverPort)
 
-	server.Serve() //nolint:errcheck
+	server.Serve() //nolint:errcheck,gosec
 }

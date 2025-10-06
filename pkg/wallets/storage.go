@@ -25,7 +25,7 @@ func InitializeStorage() *Storage {
 // Store adds the wallet to storage while preserving status state.
 func (s *Storage) Store(wallet *Wallet) error {
 	idPair := KeyIDPair{WalletID: wallet.WalletID, KeyID: wallet.KeyID}
-	walletCopied := CopyWallet(wallet)
+	walletCopied := wallet.Copy()
 
 	s.Lock()
 	defer s.Unlock()
@@ -62,7 +62,7 @@ func (s *Storage) Get(idPair KeyIDPair) (*Wallet, error) {
 	if !ok || wallet == nil {
 		return nil, ErrWalletNonExistent
 	}
-	walletCopy := CopyWallet(wallet)
+	walletCopy := wallet.Copy()
 
 	return walletCopy, nil
 }
@@ -74,7 +74,7 @@ func (s *Storage) GetWallets() []*Wallet {
 	s.RLock()
 	defer s.RUnlock()
 	for _, wallet := range s.wallets {
-		wallets[i] = CopyWallet(wallet)
+		wallets[i] = wallet.Copy()
 		i++
 	}
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/policy"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/xrpl"
@@ -66,9 +67,9 @@ func (p *Processor) SignXRPLPayment(
 
 	signerItems := make([]*signer.Signer, 0, len(keyIDs))
 	for j := range keyIDs {
-		walletKeyIdPair := wallets.KeyIDPair{WalletID: inst.WalletId, KeyID: keyIDs[j]}
+		idPair := wallets.KeyIDPair{WalletID: inst.WalletId, KeyID: keyIDs[j]}
 
-		key, err := p.Get(walletKeyIdPair)
+		key, err := p.Get(idPair)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -86,7 +87,12 @@ func (p *Processor) SignXRPLPayment(
 			return nil, nil, err
 		}
 
-		sigItem, err := secp256k1.SignTxMultisig(tx, key.PrivateKey)
+		sk, err := crypto.ToECDSA(key.PrivateKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		sigItem, err := secp256k1.SignTxMultisig(tx, sk)
 		if err != nil {
 			return nil, nil, err
 		}

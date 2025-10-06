@@ -26,6 +26,13 @@ const DataProvidersThreshold = uint64(666)
 // and providers so it can be reconstructed later. The result is signed with the
 // key that is split, but remains to be signed by the TEE.
 func BackupWallet(wallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, signingPolicyWeights []uint16, rewardEpochId uint32, teeID common.Address, normalizationParam uint16, dataProviderThreshold uint64) (*backup.WalletBackup, error) {
+	switch wallet.SigningAlgo {
+	case wallets.XRPAlgo, wallets.EVMAlgo:
+		// continue
+	default:
+		return nil, errors.New("unsupported signing algorithm")
+	}
+
 	adminPubKeys := make([]types.PublicKey, len(wallet.AdminPublicKeys))
 	for i, pubKey := range wallet.AdminPublicKeys {
 		adminPubKeys[i] = types.PubKeyToStruct(pubKey)
@@ -36,12 +43,14 @@ func BackupWallet(wallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, si
 		return nil, err
 	}
 
+	sk := wallets.ToECDSAUnsafe(wallet.PrivateKey)
+
 	metaData := backup.WalletBackupMetaData{
 		WalletBackupID: wallets.WalletBackupID{
 			TeeID:         teeID,
 			WalletID:      wallet.WalletID,
 			KeyID:         wallet.KeyID,
-			PublicKey:     types.PubKeyToBytes(&wallet.PrivateKey.PublicKey),
+			PublicKey:     types.PubKeyToBytes(&sk.PublicKey),
 			KeyType:       wallet.KeyType,
 			SigningAlgo:   wallet.SigningAlgo,
 			RewardEpochID: rewardEpochId,
@@ -55,18 +64,18 @@ func BackupWallet(wallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, si
 	}
 	copy(metaData.Cosigners, wallet.Cosigners)
 
-	splitKey, err := SplitPrivateKey(wallet.PrivateKey, 2)
+	splitKey, err := SplitPrivateKey(sk, 2)
 	if err != nil {
 		return nil, err
 	}
 
 	weightsOne := utils.ConstantSlice(uint16(1), len(wallet.AdminPublicKeys))
-	adminEncryptedParts, err := SplitAndEncrypt(splitKey[0], wallet.AdminPublicKeys, wallet.AdminsThreshold, weightsOne, metaData.WalletBackupID, wallet.PrivateKey, true)
+	adminEncryptedParts, err := SplitAndEncrypt(splitKey[0], wallet.AdminPublicKeys, wallet.AdminsThreshold, weightsOne, metaData.WalletBackupID, sk, true)
 	if err != nil {
 		return nil, err
 	}
 
-	providerEncryptedParts, err := SplitAndEncrypt(splitKey[1], providerPubKeys, dataProviderThreshold, normalizedWeights, metaData.WalletBackupID, wallet.PrivateKey, false)
+	providerEncryptedParts, err := SplitAndEncrypt(splitKey[1], providerPubKeys, dataProviderThreshold, normalizedWeights, metaData.WalletBackupID, sk, false)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +90,7 @@ func BackupWallet(wallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, si
 	if err != nil {
 		return nil, err
 	}
-	walletBackup.Signature, err = utils.Sign(hash[:], wallet.PrivateKey)
+	walletBackup.Signature, err = utils.Sign(hash[:], sk)
 	if err != nil {
 		return nil, err
 	}
@@ -231,8 +240,7 @@ func RecoverWallet(
 	return &wallets.Wallet{
 		WalletID:    backupMetaData.WalletID,
 		KeyID:       backupMetaData.KeyID,
-		PrivateKey:  key,
-		Address:     crypto.PubkeyToAddress(key.PublicKey),
+		PrivateKey:  common.BigToHash(key.D).Bytes(),
 		KeyType:     backupMetaData.KeyType,
 		SigningAlgo: backupMetaData.SigningAlgo,
 		Restored:    true,

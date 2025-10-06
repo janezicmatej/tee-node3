@@ -33,7 +33,6 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/wallets"
 
 	"github.com/flare-foundation/tee-node/pkg/utils"
-	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
 
@@ -159,8 +158,7 @@ func initializePolicy(t *testing.T, actionInfoChan chan *types.Action,
 	actionInfoChan <- action
 
 	actionResponse := <-actionResponseChan
-	fmt.Println(actionResponse.Result.Log)
-	require.Equal(t, uint8(1), actionResponse.Result.Status)
+	require.Equal(t, uint8(1), actionResponse.Result.Status, actionResponse.Result.Log)
 }
 
 func getTeeInfo(
@@ -738,9 +736,9 @@ func ftdcProve(
 
 func MockProxy(t *testing.T, proxyPort int, mainActionInfoChan, readActionInfoChan chan *types.Action,
 	actionResponseChan chan *types.ActionResponse) {
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 
-	router.HandleFunc("/queue/main", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("POST /queue/main", func(w http.ResponseWriter, r *http.Request) {
 		var action types.Action
 		select {
 		case x := <-mainActionInfoChan:
@@ -754,9 +752,9 @@ func MockProxy(t *testing.T, proxyPort int, mainActionInfoChan, readActionInfoCh
 
 		_, err = w.Write(response)
 		require.NoError(t, err)
-	}).Methods("POST")
+	})
 
-	router.HandleFunc("/queue/direct", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("POST /queue/direct", func(w http.ResponseWriter, r *http.Request) {
 		var action types.Action
 		select {
 		case x := <-readActionInfoChan:
@@ -770,9 +768,9 @@ func MockProxy(t *testing.T, proxyPort int, mainActionInfoChan, readActionInfoCh
 
 		_, err = w.Write(response)
 		require.NoError(t, err)
-	}).Methods("POST")
+	})
 
-	router.HandleFunc("/result", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("POST /result", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
@@ -782,7 +780,7 @@ func MockProxy(t *testing.T, proxyPort int, mainActionInfoChan, readActionInfoCh
 		actionResponseChan <- &actionResponse
 		err = r.Body.Close()
 		require.NoError(t, err)
-	}).Methods("POST")
+	})
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", proxyPort), router))
 }

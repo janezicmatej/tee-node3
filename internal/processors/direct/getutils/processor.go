@@ -66,7 +66,7 @@ func (p *Processor) KeysInfo(_ *types.DirectInstruction) ([]byte, error) {
 
 	signedProofs := make([]wallets.SignedKeyExistenceProof, len(storedWallets))
 	for i, storedWallet := range storedWallets {
-		ep := wallets.WalletToKeyExistenceProof(storedWallet, teeID)
+		ep := storedWallet.KeyExistenceProof(teeID)
 		epEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, ep)
 		if err != nil {
 			return nil, err

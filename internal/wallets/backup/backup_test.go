@@ -49,8 +49,7 @@ func TestBackupAndRecover(t *testing.T) {
 	givenWallet := &wallets.Wallet{
 		WalletID:    idPair.WalletID,
 		KeyID:       idPair.KeyID,
-		PrivateKey:  sk,
-		Address:     crypto.PubkeyToAddress(sk.PublicKey),
+		PrivateKey:  common.BigToHash(sk.D).Bytes(),
 		KeyType:     wallets.XRPType,
 		SigningAlgo: wallets.XRPAlgo,
 		Restored:    false,
