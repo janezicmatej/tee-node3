@@ -7,7 +7,6 @@ require (
 	github.com/flare-foundation/go-flare-common v1.2.1-0.20251001153328-6a2d040f5751
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-tpm-tools v0.4.5
-	github.com/gorilla/mux v1.8.1
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621

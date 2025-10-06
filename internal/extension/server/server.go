@@ -115,7 +115,7 @@ func (s *ExtensionServer) getKeyInfoHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	walletInfo := wallets.WalletToKeyExistenceProof(wallet, s.node.TeeID())
+	walletInfo := wallet.KeyExistenceProof(s.node.TeeID())
 
 	response, err := json.Marshal(walletInfo)
 	if err != nil {
@@ -153,11 +153,6 @@ func (s *ExtensionServer) signWithKeyHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if len(signRequest.Message) != 32 {
-		http.Error(w, "message is not 32 bytes long", http.StatusBadRequest)
-		return
-	}
-
 	wallet, err := s.wStorage.Get(wallets.KeyIDPair{WalletID: wID, KeyID: kID})
 	if err != nil {
 		if errors.Is(err, wallets.ErrWalletNonExistent) {
@@ -169,7 +164,7 @@ func (s *ExtensionServer) signWithKeyHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Sign the message with the wallet's private key
-	signature, err := crypto.Sign(signRequest.Message, wallet.PrivateKey)
+	signature, err := wallet.Sign(signRequest.Message)
 	if err != nil {
 		http.Error(w, "can not sign", http.StatusInternalServerError)
 		return
@@ -305,7 +300,7 @@ func (s *ExtensionServer) decryptWithKeyHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	decryptedMessage, err := Decrypt(decryptRequest.EncryptedMessage, wallet.PrivateKey)
+	decryptedMessage, err := wallet.Decrypt(decryptRequest.EncryptedMessage)
 	if err != nil {
 		http.Error(w, "can not decrypt", http.StatusBadRequest)
 	}
@@ -354,9 +349,9 @@ func (s *ExtensionServer) decryptWithTeeHandler(w http.ResponseWriter, r *http.R
 	}
 }
 
-// Encrypt wraps the ECIES encryption helper for plaintext using the provided
+// encrypt wraps the ECIES encryption helper for plaintext using the provided
 // public key.
-func Encrypt(plaintext []byte, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func encrypt(plaintext []byte, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	pk := ecies.ImportECDSAPublic(publicKey)
 	privKeyEncryption, err := ecies.Encrypt(rand.Reader, pk, plaintext, nil, nil)
 	if err != nil {
@@ -364,17 +359,6 @@ func Encrypt(plaintext []byte, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	}
 
 	return privKeyEncryption, nil
-}
-
-// Decrypt decrypts an ECIES encrypted message using the supplied private key.
-func Decrypt(cipher []byte, privateKey *ecdsa.PrivateKey) ([]byte, error) {
-	privKeyDecryption := ecies.ImportECDSA(privateKey)
-	plaintext, err := privKeyDecryption.Decrypt(cipher, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return plaintext, nil
 }
 
 func uint64Param(r *http.Request, param string) (uint64, error) {

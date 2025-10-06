@@ -15,11 +15,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
+	"github.com/flare-foundation/go-flare-common/pkg/xrpl/hash"
 	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/pkg/node"
 	"github.com/flare-foundation/tee-node/pkg/types"
-	pkgwallets "github.com/flare-foundation/tee-node/pkg/wallets"
-	"github.com/gorilla/mux"
+	"github.com/flare-foundation/tee-node/pkg/wallets"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -31,7 +31,7 @@ func setupTestServer(t *testing.T, proxyPort int, port int) *ExtensionServer {
 	testNode, err := node.Initialize(node.ZeroState{})
 	require.NoError(t, err)
 
-	wStorage := pkgwallets.InitializeStorage()
+	wStorage := wallets.InitializeStorage()
 
 	proxyUrl := settings.ProxyURLMutex{
 		URL: "http://localhost:" + strconv.Itoa(proxyPort),
@@ -43,24 +43,24 @@ func setupTestServer(t *testing.T, proxyPort int, port int) *ExtensionServer {
 	return server
 }
 
-func setupTestWallet(t *testing.T, ws *pkgwallets.Storage) *pkgwallets.Wallet {
+func setupTestWallet(t *testing.T, ws *wallets.Storage, signingAlgo common.Hash) *wallets.Wallet {
 	// Generate a test private key
-	privateKey, err := crypto.GenerateKey()
+	privateKey, err := wallets.GenerateKey(signingAlgo)
 	require.NoError(t, err)
 
-	seed, err := crypto.Sign(crypto.Keccak256([]byte("random")), privateKey)
+	seed := crypto.Keccak256(privateKey, []byte("random"))
 	require.NoError(t, err)
 
 	// Create test wallet
 	walletID := crypto.Keccak256Hash(seed)
 	keyID := uint64(0)
 
-	wallet := &pkgwallets.Wallet{
-		WalletID:   walletID,
-		KeyID:      keyID,
-		PrivateKey: privateKey,
-		Address:    crypto.PubkeyToAddress(privateKey.PublicKey),
-		Status: &pkgwallets.WalletStatus{
+	wallet := &wallets.Wallet{
+		WalletID:    walletID,
+		KeyID:       keyID,
+		PrivateKey:  privateKey,
+		SigningAlgo: signingAlgo,
+		Status: &wallets.WalletStatus{
 			Nonce:      0,
 			StatusCode: 0,
 		},
@@ -71,7 +71,7 @@ func setupTestWallet(t *testing.T, ws *pkgwallets.Storage) *pkgwallets.Wallet {
 	require.NoError(t, err)
 
 	// Verify wallet was stored
-	storedWallet, err := ws.Get(pkgwallets.KeyIDPair{WalletID: walletID, KeyID: keyID})
+	storedWallet, err := ws.Get(wallets.KeyIDPair{WalletID: walletID, KeyID: keyID})
 	require.NoError(t, err)
 	require.NotNil(t, storedWallet)
 
@@ -85,7 +85,7 @@ func TestGetKeyInfoHandler(t *testing.T) {
 	go extServer.Serve()                        //nolint:errcheck
 	defer extServer.Close(context.Background()) //nolint:errcheck
 
-	testWallet := setupTestWallet(t, extServer.wStorage)
+	testWallet := setupTestWallet(t, extServer.wStorage, wallets.XRPAlgo)
 	wID, kID := testWallet.WalletID, testWallet.KeyID
 	url := fmt.Sprintf("http://localhost:%d/key-info/%s/%d", port, wID.Hex(), kID)
 
@@ -119,7 +119,7 @@ func TestSignWithKeyHandler(t *testing.T) {
 	go server.Serve()                        //nolint:errcheck
 	defer server.Close(context.Background()) //nolint:errcheck
 
-	wallet := setupTestWallet(t, server.wStorage)
+	wallet := setupTestWallet(t, server.wStorage, wallets.XRPAlgo)
 	wID, kID := wallet.WalletID, wallet.KeyID
 
 	// Create test message
@@ -150,9 +150,9 @@ func TestSignWithKeyHandler(t *testing.T) {
 	signature := response.Signature
 
 	// Verify the signature
-	pubKey, err := crypto.SigToPub(message, signature)
+	pubKey, err := crypto.SigToPub(hash.Sha512Half(message), signature)
 	require.NoError(t, err)
-	require.Equal(t, wallet.PrivateKey.PublicKey, *pubKey)
+	require.Equal(t, wallets.ToECDSAUnsafe(wallet.PrivateKey).PublicKey, *pubKey)
 }
 
 func TestSignWithTeeHandler(t *testing.T) {
@@ -203,13 +203,13 @@ func TestDecryptWithKeyHandler(t *testing.T) {
 	go server.Serve()                        //nolint:errcheck
 	defer server.Close(context.Background()) //nolint:errcheck
 
-	wallet := setupTestWallet(t, server.wStorage)
+	wallet := setupTestWallet(t, server.wStorage, wallets.XRPAlgo)
 	walletId, keyId := wallet.WalletID, wallet.KeyID
 
 	// Create test encrypted message (this is a dummy encrypted message for testing)
 	message := []byte("encrypted test message")
 
-	encryptedMessage, err := Encrypt(message, &wallet.PrivateKey.PublicKey)
+	encryptedMessage, err := encrypt(message, &wallets.ToECDSAUnsafe(wallet.PrivateKey).PublicKey)
 	require.NoError(t, err)
 
 	// Create request body
@@ -241,7 +241,7 @@ func TestDecryptWithTeeHandler(t *testing.T) {
 
 	teePubKey, err := types.ParsePubKey(server.node.Info().PublicKey)
 	require.NoError(t, err)
-	encryptedMessage, err := Encrypt(message, teePubKey)
+	encryptedMessage, err := encrypt(message, teePubKey)
 	require.NoError(t, err)
 
 	// Create request body
@@ -291,9 +291,9 @@ func TestPostResultHandler(t *testing.T) {
 }
 
 func mockProxyResult(t *testing.T, proxyPort int, actionResponseChan chan *types.ActionResponse) {
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 
-	router.HandleFunc("/result", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("POST /result", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
@@ -304,7 +304,7 @@ func mockProxyResult(t *testing.T, proxyPort int, actionResponseChan chan *types
 		actionResponseChan <- &actionResponse
 		err = r.Body.Close()
 		require.NoError(t, err)
-	}).Methods("POST")
+	})
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", proxyPort), router))
 }

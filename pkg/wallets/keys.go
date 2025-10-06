@@ -2,6 +2,7 @@ package wallets
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"math/big"
 
 	"github.com/flare-foundation/tee-node/pkg/types"
@@ -10,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 )
 
@@ -18,8 +20,7 @@ import (
 type Wallet struct {
 	WalletID    common.Hash
 	KeyID       uint64
-	PrivateKey  *ecdsa.PrivateKey
-	Address     common.Address
+	PrivateKey  []byte
 	KeyType     common.Hash
 	SigningAlgo common.Hash
 
@@ -44,11 +45,10 @@ type WalletStatus struct {
 
 // GenerateNewKey creates a wallet from the key generate instruction payload.
 func GenerateNewKey(kg wallet.ITeeWalletKeyManagerKeyGenerate) (*Wallet, error) {
-	sk, err := crypto.GenerateKey()
+	sk, err := GenerateKey(kg.SigningAlgo)
 	if err != nil {
 		return nil, err
 	}
-
 	adminsPubKeys, err := utils.ParsePubKeys(kg.ConfigConstants.AdminsPublicKeys)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,6 @@ func GenerateNewKey(kg wallet.ITeeWalletKeyManagerKeyGenerate) (*Wallet, error) 
 		WalletID:           kg.WalletId,
 		KeyID:              kg.KeyId,
 		PrivateKey:         sk,
-		Address:            crypto.PubkeyToAddress(sk.PublicKey),
 		KeyType:            kg.KeyType,
 		SigningAlgo:        kg.SigningAlgo,
 		Restored:           false,
@@ -75,44 +74,42 @@ func GenerateNewKey(kg wallet.ITeeWalletKeyManagerKeyGenerate) (*Wallet, error) 
 	return newWallet, nil
 }
 
-// CopyWallet returns a deep copy of the wallet structure.
-func CopyWallet(inputWallet *Wallet) *Wallet {
+// Copy returns a deep copy of the wallet.
+func (w *Wallet) Copy() *Wallet {
 	walletCopy := &Wallet{
-		WalletID:    inputWallet.WalletID,
-		KeyID:       inputWallet.KeyID,
-		PrivateKey:  crypto.ToECDSAUnsafe(inputWallet.PrivateKey.D.Bytes()),
-		Address:     inputWallet.Address,
-		KeyType:     inputWallet.KeyType,
-		SigningAlgo: inputWallet.SigningAlgo,
+		WalletID:    w.WalletID,
+		KeyID:       w.KeyID,
+		PrivateKey:  append(make([]byte, 0, len(w.PrivateKey)), w.PrivateKey...),
+		KeyType:     w.KeyType,
+		SigningAlgo: w.SigningAlgo,
 
-		Restored: inputWallet.Restored,
+		Restored: w.Restored,
 
-		AdminPublicKeys:    make([]*ecdsa.PublicKey, len(inputWallet.AdminPublicKeys)),
-		AdminsThreshold:    inputWallet.AdminsThreshold,
-		Cosigners:          make([]common.Address, len(inputWallet.Cosigners)),
-		CosignersThreshold: inputWallet.CosignersThreshold,
+		AdminPublicKeys:    make([]*ecdsa.PublicKey, len(w.AdminPublicKeys)),
+		AdminsThreshold:    w.AdminsThreshold,
+		Cosigners:          make([]common.Address, len(w.Cosigners)),
+		CosignersThreshold: w.CosignersThreshold,
 
-		SettingsVersion: inputWallet.SettingsVersion,
-		Settings:        make([]byte, len(inputWallet.Settings)),
+		SettingsVersion: w.SettingsVersion,
+		Settings:        make([]byte, len(w.Settings)),
 
 		Status: &WalletStatus{
-			Nonce:        inputWallet.Status.Nonce,
-			StatusCode:   inputWallet.Status.StatusCode,
-			PausingNonce: inputWallet.Status.PausingNonce,
+			Nonce:        w.Status.Nonce,
+			StatusCode:   w.Status.StatusCode,
+			PausingNonce: w.Status.PausingNonce,
 		},
 	}
-	copy(walletCopy.AdminPublicKeys, inputWallet.AdminPublicKeys)
-	copy(walletCopy.Cosigners, inputWallet.Cosigners)
-	copy(walletCopy.Settings, inputWallet.Settings)
+	copy(walletCopy.AdminPublicKeys, w.AdminPublicKeys)
+	copy(walletCopy.Cosigners, w.Cosigners)
+	copy(walletCopy.Settings, w.Settings)
 
 	return walletCopy
 }
 
-// WalletToKeyExistenceProof builds a key existence proof for the supplied
-// wallet.
-func WalletToKeyExistenceProof(inputWallet *Wallet, teeID common.Address) *wallet.ITeeWalletKeyManagerKeyExistence {
-	adminPubKeys := make([]wallet.PublicKey, len(inputWallet.AdminPublicKeys))
-	for i, pubKey := range inputWallet.AdminPublicKeys {
+// KeyExistenceProof builds a key existence proof for the wallet.
+func (w *Wallet) KeyExistenceProof(teeID common.Address) *wallet.ITeeWalletKeyManagerKeyExistence {
+	adminPubKeys := make([]wallet.PublicKey, len(w.AdminPublicKeys))
+	for i, pubKey := range w.AdminPublicKeys {
 		pkt := types.PubKeyToStruct(pubKey)
 
 		adminPubKeys[i] = wallet.PublicKey{
@@ -123,20 +120,89 @@ func WalletToKeyExistenceProof(inputWallet *Wallet, teeID common.Address) *walle
 
 	return &wallet.ITeeWalletKeyManagerKeyExistence{
 		TeeId:       teeID,
-		WalletId:    inputWallet.WalletID,
-		KeyId:       inputWallet.KeyID,
-		KeyType:     inputWallet.KeyType,
-		SigningAlgo: inputWallet.SigningAlgo,
-		PublicKey:   types.PubKeyToBytes(&inputWallet.PrivateKey.PublicKey),
-		Nonce:       new(big.Int).SetUint64(inputWallet.Status.Nonce),
-		Restored:    inputWallet.Restored,
+		WalletId:    w.WalletID,
+		KeyId:       w.KeyID,
+		KeyType:     w.KeyType,
+		SigningAlgo: w.SigningAlgo,
+		PublicKey:   w.pubKey(),
+		Nonce:       new(big.Int).SetUint64(w.Status.Nonce),
+		Restored:    w.Restored,
 		ConfigConstants: wallet.ITeeWalletKeyManagerKeyConfigConstants{
 			AdminsPublicKeys:   adminPubKeys,
-			AdminsThreshold:    inputWallet.AdminsThreshold,
-			Cosigners:          inputWallet.Cosigners,
-			CosignersThreshold: inputWallet.CosignersThreshold,
+			AdminsThreshold:    w.AdminsThreshold,
+			Cosigners:          w.Cosigners,
+			CosignersThreshold: w.CosignersThreshold,
 		},
-		SettingsVersion: inputWallet.SettingsVersion,
-		Settings:        inputWallet.Settings,
+		SettingsVersion: w.SettingsVersion,
+		Settings:        w.Settings,
 	}
+}
+
+// Sign returns a cryptographic signature of the message using the wallet's signing algorithm.
+func (w *Wallet) Sign(msg []byte) ([]byte, error) {
+	switch w.SigningAlgo {
+	case XRPAlgo:
+		prv := ToECDSAUnsafe(w.PrivateKey)
+		return signSHA512HalfSecp256k1ECDSA(prv, msg)
+	case EVMAlgo:
+		prv := ToECDSAUnsafe(w.PrivateKey)
+		return signKeccak256Secp256k1ECDSA(prv, msg)
+	default:
+		return nil, errors.New("unsupported signing algorithm")
+	}
+}
+
+// Decrypt decrypts an encrypted message using the supplied private key based on type of key.
+func (w *Wallet) Decrypt(cipher []byte) ([]byte, error) {
+	switch w.SigningAlgo {
+	case XRPAlgo, EVMAlgo:
+		prv := ToECDSAUnsafe(w.PrivateKey)
+		prvDecryption := ecies.ImportECDSA(prv)
+		plaintext, err := prvDecryption.Decrypt(cipher, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		return plaintext, nil
+
+	default:
+		return nil, errors.New("wallet does not support decryption")
+	}
+}
+
+func (w *Wallet) pubKey() []byte {
+	switch w.SigningAlgo {
+	case XRPAlgo, EVMAlgo:
+		prv := ToECDSAUnsafe(w.PrivateKey)
+		return types.PubKeyToBytes(&prv.PublicKey)
+	default:
+		return []byte{}
+	}
+}
+
+// GenerateKey creates a new private key for the signing algorithm.
+func GenerateKey(signingAlgo common.Hash) ([]byte, error) {
+	switch signingAlgo {
+	case XRPAlgo, EVMAlgo:
+		sk, err := crypto.GenerateKey()
+		if err != nil {
+			return nil, err
+		}
+		return common.BigToHash(sk.D).Bytes(), nil
+	default:
+		return nil, errors.New("unsupported signing algorithm")
+	}
+}
+
+// ToECDSAUnsafe converts a private key from byte slice to *ecdsa.PrivateKey.
+// Use only if you are sure that bytes represent a valid private key.
+//
+// Based on go-ethereum's crypto.ToECDSAUnsafe.
+func ToECDSAUnsafe(sk []byte) *ecdsa.PrivateKey {
+	priv := new(ecdsa.PrivateKey)
+	priv.Curve = crypto.S256()
+	priv.D = new(big.Int).SetBytes(sk)
+	priv.PublicKey.X, priv.PublicKey.Y = priv.Curve.ScalarBaseMult(sk) //nolint:staticcheck // we keep PublicKey for clarity
+
+	return priv
 }

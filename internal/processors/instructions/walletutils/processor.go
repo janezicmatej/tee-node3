@@ -69,7 +69,7 @@ func (p *Processor) KeyGenerate(
 		return nil, nil, err
 	}
 
-	existenceProof := wallets.WalletToKeyExistenceProof(storedWallet, p.TeeID())
+	existenceProof := storedWallet.KeyExistenceProof(p.TeeID())
 	existenceProofEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, existenceProof)
 	if err != nil {
 		return nil, nil, err
@@ -177,7 +177,7 @@ func (p *Processor) KeyDataProviderRestore(
 			return nil, nil, err
 		}
 
-		ep := wallets.WalletToKeyExistenceProof(storedWallet, p.TeeID())
+		ep := storedWallet.KeyExistenceProof(p.TeeID())
 		existenceProofEncoded, err := structs.Encode(wallet.KeyExistenceStructArg, ep)
 		if err != nil {
 			return nil, nil, err
