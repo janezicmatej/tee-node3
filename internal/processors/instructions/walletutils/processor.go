@@ -119,6 +119,13 @@ func (p *Processor) KeyDelete(
 
 		p.wStorage.Remove(id)
 		p.wStorage.UpdateNonce(id, req.Nonce.Uint64())
+
+		encodedID, err := json.Marshal(id)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return encodedID, nil, nil
 	case types.End:
 
 		exists := p.wStorage.WalletExists(id)

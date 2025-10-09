@@ -147,10 +147,15 @@ func TestKeyDelete(t *testing.T) {
 
 	resp, status, err := processor.KeyDelete(types.Threshold, &deleteInstruction, nil, nil, nil)
 	require.NoError(t, err)
-	require.Nil(t, resp)
-	require.Nil(t, status)
 
 	idPair := wallets.KeyIDPair{WalletID: walletID, KeyID: keyID}
+
+	encoded, err := json.Marshal(idPair)
+	require.NoError(t, err)
+	require.Equal(t, resp, encoded)
+
+	require.Nil(t, status)
+
 	require.False(t, wStorage.WalletExists(idPair))
 
 	nonce, err := wStorage.Nonce(idPair)
