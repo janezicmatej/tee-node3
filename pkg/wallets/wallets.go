@@ -97,8 +97,8 @@ func nonceCheck(nonce *big.Int) error {
 }
 
 type KeyIDPair struct {
-	WalletID common.Hash
-	KeyID    uint64
+	WalletID common.Hash `json:"walletId"`
+	KeyID    uint64      `json:"keyId"`
 }
 
 type TEEBackupResponse struct {
