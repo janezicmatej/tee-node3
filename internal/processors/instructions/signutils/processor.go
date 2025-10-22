@@ -3,6 +3,7 @@ package signutils
 import (
 	"encoding/json"
 	"errors"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -47,10 +48,16 @@ func (p *Processor) SignXRPLPayment(
 		return nil, nil, err
 	}
 
-	tx := xrpl.PaymentTxFromInstruction(inst)
-	err = xrpl.CheckNativePayment(tx)
-	if err != nil {
-		return nil, nil, err
+	var tx map[string]any
+
+	if inst.Amount.Cmp(big.NewInt(0)) == 0 && inst.RecipientAddress == inst.SenderAddress {
+		tx = xrpl.Nullify(inst)
+	} else {
+		tx = xrpl.PaymentTxFromInstruction(inst)
+		err = xrpl.CheckNativePayment(tx)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	keyIDs := make([]uint64, 0, 10)
