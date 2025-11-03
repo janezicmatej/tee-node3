@@ -73,14 +73,14 @@ func StartTestServerExtension(t *testing.T, setProxyPort, serverPort, extensionP
 	ws := wallets.InitializeStorage()
 	ps := policy.InitializeStorage()
 
-	pc := settings.NewProxyConfigServer(setProxyPort)
+	pc := settings.NewConfigServer(setProxyPort, teeNode)
 	go pc.Serve() //nolint:errcheck
 
-	extServer := server.NewExtensionServer(serverPort, teeNode, ws, pc.ProxyUrl)
+	extServer := server.NewExtensionServer(serverPort, teeNode, ws, pc.ProxyURL)
 
 	go extServer.Serve() //nolint:errcheck
 
-	r := router.NewExtensionRouter(teeNode, ws, ps, extensionPort, pc.ProxyUrl)
+	r := router.NewExtensionRouter(teeNode, ws, ps, extensionPort, pc.ProxyURL)
 
 	// Launch the json rpc server
 	go r.Run(teeNode)

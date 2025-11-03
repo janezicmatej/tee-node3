@@ -82,8 +82,8 @@ func ConstructTEEInfoResponse(challenge common.Hash, nodeInfo *node.Info, initia
 		return nil, err
 	}
 
-	var cHash common.Hash
-	var platform common.Hash
+	cHash := common.HexToHash("4743505f494e54454c5f54445800000000000000000000000000000000000000")
+	platform := common.HexToHash("194844cf417dde867073e5ab7199fa4d21fd82b5dbe2bdea8b3d7fc18d10fdc2")
 
 	if settings.Mode == 0 {
 		_, claims, err := googlecloud.ParsePKITokenUnverified(string(attestationBytes))
