@@ -3,7 +3,6 @@ package attestation
 import (
 	"crypto/x509"
 	"encoding/hex"
-	"errors"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,32 +22,6 @@ func SetGoogleCert() error {
 	GoogleCert, err = attestation.LoadRootCert(settings.GoogleCertLoc)
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// SelfAttest performs a local attestation cycle, falling back to MagicPass in
-// non-production modes.
-func SelfAttest() error {
-	tokeBytes, err := GetGoogleAttestationToken([]string{}, "PKI")
-	if err != nil {
-		return err
-	}
-	if string(tokeBytes) == attestation.MagicPass {
-		return nil
-	}
-
-	token, err := attestation.ValidatePKIToken(GoogleCert, string(tokeBytes))
-	if err != nil {
-		return err
-	}
-	ok, err := attestation.ValidateClaims(token, []string{})
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return errors.New("failed validating token")
 	}
 
 	return nil
@@ -86,7 +59,8 @@ func ConstructTEEInfoResponse(challenge common.Hash, nodeInfo *node.Info, initia
 	platform := common.HexToHash("194844cf417dde867073e5ab7199fa4d21fd82b5dbe2bdea8b3d7fc18d10fdc2")
 
 	if settings.Mode == 0 {
-		_, claims, err := googlecloud.ParsePKITokenUnverified(string(attestationBytes))
+		claims := &attestation.NeededClaims{}
+		_, claims, err := googlecloud.ParsePKITokenUnverifiedClaims(string(attestationBytes), claims)
 		if err != nil {
 			return nil, err
 		}
