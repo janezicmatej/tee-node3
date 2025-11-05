@@ -235,7 +235,7 @@ func generateWallet(
 	err = utils.VerifySignature(crypto.Keccak256(response.Result.Data), response.Signature, teeId)
 	require.NoError(t, err)
 
-	walletExistenceProof, err := wallets.ExtractKeyExistence(response.Result.Data)
+	walletExistenceProof, err := wallets.ExtractKeyExistence(response.Result.Data, teeId)
 	require.NoError(t, err)
 
 	newWallet, err := wStorage.Get(wallets.KeyIDPair{WalletID: walletId, KeyID: keyId})
@@ -511,7 +511,7 @@ func recoverWallet(t *testing.T, actionInfoChan chan *types.Action,
 	err = utils.VerifySignature(crypto.Keccak256(response.Result.Data), response.Signature, teeId)
 	require.NoError(t, err)
 
-	walletExistenceProof, err := wallets.ExtractKeyExistence(response.Result.Data)
+	walletExistenceProof, err := wallets.ExtractKeyExistence(response.Result.Data, teeId)
 	require.NoError(t, err)
 
 	// check that commonwallet is actually on the tee

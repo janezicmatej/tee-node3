@@ -91,7 +91,7 @@ func CreateMockWallet(
 	walletProofBytes, _, err := proc.KeyGenerate(types.Threshold, &instructionDataFixed, nil, nil, nil)
 	require.NoError(t, err)
 
-	walletExistenceProof, err := wallets.ExtractKeyExistence(walletProofBytes)
+	walletExistenceProof, err := wallets.ExtractKeyExistence(walletProofBytes, iSndD.TeeID())
 	require.NoError(t, err)
 
 	require.NoError(t, err)
