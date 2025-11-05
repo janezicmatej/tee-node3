@@ -91,6 +91,9 @@ func dataProvidersThreshold(data *instruction.DataFixed, totalWeight uint16) (ui
 		if rh.ThresholdBIPS < maxBIPS/2 && data.CosignersThreshold*2 <= uint64(len(data.Cosigners)) {
 			return 0, errors.New("one threshold should be above 50%")
 		}
+		if rh.ThresholdBIPS >= maxBIPS {
+			return 0, errors.New("data providers threshold too high")
+		}
 
 		threshold = computeThreshold(totalWeight, rh.ThresholdBIPS)
 
