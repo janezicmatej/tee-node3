@@ -124,12 +124,3 @@ func (s *Storage) UpdateNonce(idPair KeyIDPair, nonce uint64) {
 		walletStatus.Nonce = nonce
 	}
 }
-
-// DestroyState clears all wallet data from storage.
-func (s *Storage) DestroyState() {
-	s.Lock()
-	defer s.Unlock()
-
-	s.wallets = make(map[KeyIDPair]*Wallet)
-	s.permanent = make(map[KeyIDPair]*WalletStatus)
-}

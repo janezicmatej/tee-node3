@@ -44,6 +44,17 @@ func CheckKeyGenerate(newWalletRequest wallet.ITeeWalletKeyManagerKeyGenerate, t
 	if len(newWalletRequest.ConfigConstants.AdminsPublicKeys) == 0 {
 		return errors.New("no admin public keys")
 	}
+	if newWalletRequest.ConfigConstants.AdminsThreshold == 0 {
+		return errors.New("admins threshold cannot be zero")
+	}
+
+	if newWalletRequest.ConfigConstants.AdminsThreshold > uint64(len(newWalletRequest.ConfigConstants.AdminsPublicKeys)) {
+		return errors.New("admins threshold cannot be greater than the number of admins")
+	}
+
+	if newWalletRequest.ConfigConstants.CosignersThreshold > uint64(len(newWalletRequest.ConfigConstants.Cosigners)) {
+		return errors.New("cosigners threshold cannot be greater than the number of cosigners")
+	}
 
 	if !slices.Contains(SigningAlgos, newWalletRequest.SigningAlgo) {
 		return errors.New("signing algorithm not supported")
@@ -157,10 +168,15 @@ type SignedKeyExistenceProof struct {
 }
 
 // ExtractKeyExistence parses a signed existence proof from bytes.
-func ExtractKeyExistence(b []byte) (*wallet.ITeeWalletKeyManagerKeyExistence, error) {
+func ExtractKeyExistence(b []byte, teeID common.Address) (*wallet.ITeeWalletKeyManagerKeyExistence, error) {
 	var wskep SignedKeyExistenceProof
-
 	err := json.Unmarshal(b, &wskep)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := crypto.Keccak256(wskep.KeyExistence)
+	err = utils.VerifySignature(hash, wskep.Signature, teeID)
 	if err != nil {
 		return nil, err
 	}
