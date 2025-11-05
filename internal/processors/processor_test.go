@@ -640,7 +640,7 @@ func ftdcProve(
 		Header: connector.IFtdcHubFtdcRequestHeader{
 			AttestationType: [32]byte{},
 			SourceId:        common.Hash{},
-			ThresholdBIPS:   uint16(testutils.TotalWeight * 0.6),
+			ThresholdBIPS:   6000,
 		},
 		RequestBody: make([]byte, 10),
 	}
