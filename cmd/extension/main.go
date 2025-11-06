@@ -13,6 +13,10 @@ import (
 )
 
 func main() {
+	if settings.Mode == 1 {
+		settings.TestCodeHash = settings.TestCodeHash1 // set different test code hash. Applicable only in mode 1.
+	}
+
 	logger.Set(logger.Config{Console: true, Level: settings.LogLevel})
 
 	teeNode, err := node.Initialize(node.ZeroState{})
@@ -29,11 +33,20 @@ func main() {
 	}
 
 	pc := settings.NewConfigServer(settings.ConfigureServerPort, teeNode)
-	go pc.Serve() //nolint:errcheck
+	go func() {
+		err := pc.Serve()
+		if err != nil {
+			logger.Errorf("config server: %w", err)
+		}
+	}()
 
 	extServer := server.NewExtensionServer(settings.ExtensionServerPort, teeNode, ws, pc.ProxyURL)
-
-	go extServer.Serve() //nolint:errcheck
+	go func() {
+		err := extServer.Serve()
+		if err != nil {
+			logger.Errorf("extension server: %w", err)
+		}
+	}()
 
 	r := router.NewExtensionRouter(teeNode, ws, ps, settings.ExtensionPort, pc.ProxyURL)
 

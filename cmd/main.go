@@ -33,7 +33,12 @@ func main() {
 	// }
 
 	pc := settings.NewConfigServer(settings.ConfigureServerPort, teeNode)
-	go pc.Serve() //nolint:errcheck
+	go func() {
+		err := pc.Serve()
+		if err != nil {
+			logger.Errorf("config server: %w", err)
+		}
+	}()
 
 	r := router.NewPMWRouter(teeNode, ws, ps, pc.ProxyURL)
 
