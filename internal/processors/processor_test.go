@@ -75,7 +75,7 @@ func TestProcessorsEndToEnd(t *testing.T) {
 	proxyPort := 8008 // Use different port for MockProxy
 	go MockProxy(t, proxyPort, mainActionInfoChan, readActionInfoChan, actionResponseChan)
 
-	pc := settings.NewConfigServer(settings.ProxyConfigureServerPort, testNode) // Use original port for ProxyConfigureServer
+	pc := settings.NewConfigServer(settings.ConfigureServerPort, testNode) // Use original port for ProxyConfigureServer
 
 	go pc.Serve() //nolint:errcheck
 
@@ -84,7 +84,7 @@ func TestProcessorsEndToEnd(t *testing.T) {
 	go r.Run(testNode)
 	time.Sleep(1 * time.Second)
 
-	setProxyUrl(t, proxyPort, settings.ProxyConfigureServerPort)
+	setProxyUrl(t, proxyPort, settings.ConfigureServerPort)
 
 	teeId, teePubKey := getTeeInfo(t, readActionInfoChan, actionResponseChan)
 

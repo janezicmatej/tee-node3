@@ -28,7 +28,7 @@ func main() {
 		logger.Fatalf("failed to load certificate: %v", err)
 	}
 
-	pc := settings.NewConfigServer(settings.ProxyConfigureServerPort, teeNode)
+	pc := settings.NewConfigServer(settings.ConfigureServerPort, teeNode)
 	go pc.Serve() //nolint:errcheck
 
 	extServer := server.NewExtensionServer(settings.ExtensionServerPort, teeNode, ws, pc.ProxyURL)

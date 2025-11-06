@@ -25,21 +25,34 @@ func init() {
 	}
 }
 
-const MaxBIPS = 10000
-const FtdcMinimumDataProvidersThreshold = float64(0.4)
-
 const EncodingVersion = "1.0.0"
 
 // Processor configuration
 var QueuedActionsSleepTime = 100 * time.Millisecond
 
-const ProxyConfigureServerPort = 5500
 const ProxyTimeout = 2 * time.Second
 
-const MaxInstructionSize = 100 * 1024 // 100 KB
-const MaxActionSize = 1024 * 1024     // 1 MB
+const (
+	MaxInstructionSize = 100 * 1024  // 100 KB
+	MaxActionSize      = 1024 * 1024 // 1 MB
+)
 
 const GoogleCertLoc = "assets/google_confidential_space_root.crt"
 
-const ExtensionServerPort = 8888
-const ExtensionPort = 8889
+const (
+	ExtensionServerPort = 8888
+	ExtensionPort       = 8889
+)
+
+const (
+	ConfigureServerPort = 5500
+
+	SetProxyURLEndpoint = "/proxy"
+	ProxyURLEnvVar      = "PROXY_URL"
+
+	SetInitialOwnerEndpoint = "/initial-owner"
+	InitialOwnerEnvVar      = "INITIAL_OWNER"
+
+	SetExtensionIDEndpoint = "/extension-id"
+	ExtensionIDEnvVar      = "EXTENSION_ID"
+)

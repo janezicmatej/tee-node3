@@ -9,7 +9,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/flare-foundation/tee-node/pkg/node"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
@@ -25,9 +25,14 @@ type ProxyConfigureServer struct {
 	ProxyURL *ProxyURLMutex
 }
 
+type Configurer interface {
+	SetOwner(common.Address) error
+	SetExtensionID(common.Hash) error
+}
+
 // NewConfigServer creates an HTTP server that accepts proxy configuration
 // requests on the provided port and exposes the configured URL via ProxyUrl.
-func NewConfigServer(port int, configurer node.Configurer) *ProxyConfigureServer {
+func NewConfigServer(port int, configurer Configurer) *ProxyConfigureServer {
 	proxyUrl := &ProxyURLMutex{}
 	proxyUrl.setProxyURLFromEnv()
 
@@ -37,9 +42,9 @@ func NewConfigServer(port int, configurer node.Configurer) *ProxyConfigureServer
 	}
 	mux := http.NewServeMux()
 	server.Handler = mux
-	mux.HandleFunc("POST /proxy", proxyUrl.setProxyURL)
-	mux.HandleFunc("POST /initial-owner", initialOwnerHandler(configurer))
-	mux.HandleFunc("POST /extension-id", extensionIDHandler(configurer))
+	mux.HandleFunc("POST "+SetProxyURLEndpoint, proxyUrl.setProxyURL)
+	mux.HandleFunc("POST"+SetInitialOwnerEndpoint, initialOwnerHandler(configurer))
+	mux.HandleFunc("POST"+SetExtensionIDEndpoint, extensionIDHandler(configurer))
 
 	pc := ProxyConfigureServer{
 		server:   server,
@@ -58,7 +63,7 @@ func (u *ProxyURLMutex) setProxyURLFromEnv() {
 		return
 	}
 
-	initialProxyURL := os.Getenv("PROXY_URL")
+	initialProxyURL := os.Getenv(ProxyURLEnvVar)
 	if initialProxyURL != "" {
 		u.URL = initialProxyURL
 	}
@@ -98,7 +103,7 @@ func (u *ProxyURLMutex) setProxyURL(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func extensionIDHandler(configurer node.Configurer) http.HandlerFunc {
+func extensionIDHandler(configurer Configurer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var request types.ConfigureExtensionIDRequest
 		decoder := json.NewDecoder(r.Body)
@@ -118,7 +123,7 @@ func extensionIDHandler(configurer node.Configurer) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 	}
 }
-func initialOwnerHandler(configurer node.Configurer) http.HandlerFunc {
+func initialOwnerHandler(configurer Configurer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var request types.ConfigureInitialOwnerRequest
 		decoder := json.NewDecoder(r.Body)

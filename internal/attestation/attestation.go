@@ -13,6 +13,11 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/types"
 )
 
+var (
+	testCodeHash = common.HexToHash("4743505f494e54454c5f54445800000000000000000000000000000000000000") // GCP_INTEL_TDX
+	testPlatform = common.HexToHash("194844cf417dde867073e5ab7199fa4d21fd82b5dbe2bdea8b3d7fc18d10fdc2")
+)
+
 var GoogleCert *x509.Certificate
 
 // SetGoogleCert loads the Google root certificate into memory for attestation
@@ -55,8 +60,8 @@ func ConstructTEEInfoResponse(challenge common.Hash, nodeInfo *node.Info, initia
 		return nil, err
 	}
 
-	cHash := common.HexToHash("4743505f494e54454c5f54445800000000000000000000000000000000000000")
-	platform := common.HexToHash("194844cf417dde867073e5ab7199fa4d21fd82b5dbe2bdea8b3d7fc18d10fdc2")
+	cHash := testCodeHash
+	platform := testPlatform
 
 	if settings.Mode == 0 {
 		claims := &attestation.NeededClaims{}

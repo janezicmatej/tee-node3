@@ -12,13 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/utils"
-)
-
-const (
-	initialOwnerEnvVar = "INITIAL_OWNER"
-	extensionIDEnvVar  = "EXTENSION_ID"
 )
 
 type Node struct {
@@ -27,7 +23,7 @@ type Node struct {
 	state      State
 
 	initialOwner common.Address
-	extensionID  common.Hash
+	extensionID  extensionID
 
 	lock sync.RWMutex
 }
@@ -39,6 +35,11 @@ type Info struct {
 
 	InitialOwner common.Address
 	ExtensionID  common.Hash
+}
+
+type extensionID struct {
+	set   bool
+	value common.Hash
 }
 
 type State interface {
@@ -92,12 +93,15 @@ func (n *Node) State() (types.TeeState, error) {
 
 // Info returns the node metadata and current state.
 func (n *Node) Info() Info {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
 	return Info{
 		TeeID:        n.teeID,
 		PublicKey:    types.PubKeyToStruct(&n.privateKey.PublicKey),
 		State:        n.state,
 		InitialOwner: n.initialOwner,
-		ExtensionID:  n.extensionID,
+		ExtensionID:  n.extensionID.value,
 	}
 }
 
@@ -149,7 +153,7 @@ func (n *Node) initialOwnerFromEnv() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	ownerB, isSet, err := bytesFromEnv(initialOwnerEnvVar)
+	ownerB, isSet, err := bytesFromEnv(settings.InitialOwnerEnvVar)
 	if !isSet {
 		return nil
 	}
@@ -170,16 +174,12 @@ func (n *Node) SetExtensionID(id common.Hash) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	zeroHash := common.Hash{}
-	if n.extensionID != zeroHash {
-		return errors.New("extension id already set")
+	if n.extensionID.set {
+		return errors.New("extension ID already set")
 	}
 
-	if id == zeroHash {
-		return errors.New("extension id cannot be zero hash")
-	}
-
-	n.extensionID = id
+	n.extensionID.set = true
+	n.extensionID.value = id
 
 	return nil
 }
@@ -188,7 +188,11 @@ func (n *Node) extensionIDFromEnv() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	extIDB, isSet, err := bytesFromEnv(extensionIDEnvVar)
+	if n.extensionID.set {
+		return errors.New("extension ID already set")
+	}
+
+	extIDB, isSet, err := bytesFromEnv(settings.ExtensionIDEnvVar)
 	if !isSet {
 		return nil
 	}
@@ -200,7 +204,9 @@ func (n *Node) extensionIDFromEnv() error {
 	}
 
 	extID := common.BytesToHash(extIDB)
-	n.extensionID = extID
+	n.extensionID.set = true
+	n.extensionID.value = extID
+
 	return nil
 }
 

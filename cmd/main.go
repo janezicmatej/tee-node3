@@ -32,7 +32,7 @@ func main() {
 	// 	logger.Fatalf("self attestation failed: %v", err)
 	// }
 
-	pc := settings.NewConfigServer(settings.ProxyConfigureServerPort, teeNode)
+	pc := settings.NewConfigServer(settings.ConfigureServerPort, teeNode)
 	go pc.Serve() //nolint:errcheck
 
 	r := router.NewPMWRouter(teeNode, ws, ps, pc.ProxyURL)
