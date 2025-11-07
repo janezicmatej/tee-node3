@@ -3,10 +3,10 @@ package attestation
 import (
 	"crypto/x509"
 	"encoding/hex"
-	"errors"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	googlecloud "github.com/flare-foundation/go-flare-common/pkg/tee/attestation/google_cloud"
 	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/pkg/attestation"
 	"github.com/flare-foundation/tee-node/pkg/node"
@@ -22,32 +22,6 @@ func SetGoogleCert() error {
 	GoogleCert, err = attestation.LoadRootCert(settings.GoogleCertLoc)
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// SelfAttest performs a local attestation cycle, falling back to MagicPass in
-// non-production modes.
-func SelfAttest() error {
-	tokeBytes, err := GetGoogleAttestationToken([]string{}, "PKI")
-	if err != nil {
-		return err
-	}
-	if string(tokeBytes) == attestation.MagicPass {
-		return nil
-	}
-
-	token, err := attestation.ValidatePKIToken(GoogleCert, string(tokeBytes))
-	if err != nil {
-		return err
-	}
-	ok, err := attestation.ValidateClaims(token, []string{})
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return errors.New("failed validating token")
 	}
 
 	return nil
@@ -81,8 +55,38 @@ func ConstructTEEInfoResponse(challenge common.Hash, nodeInfo *node.Info, initia
 		return nil, err
 	}
 
+	cHash := settings.TestCodeHash
+	platform := settings.TestPlatform
+
+	if settings.Mode == 0 {
+		claims := &attestation.NeededClaims{}
+		_, claims, err := googlecloud.ParsePKITokenUnverifiedClaims(string(attestationBytes), claims)
+		if err != nil {
+			return nil, err
+		}
+
+		cHash, err = claims.CodeHash()
+		if err != nil {
+			return nil, err
+		}
+
+		platform, err = claims.Platform()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	mData := types.MachineData{
+		ExtensionID:  nodeInfo.ExtensionID,
+		InitialOwner: nodeInfo.InitialOwner,
+		CodeHash:     cHash,
+		Platform:     platform,
+		PublicKey:    nodeInfo.PublicKey,
+	}
+
 	teeInfoResponse := types.TeeInfoResponse{
 		TeeInfo:     teeInfo,
+		MachineData: mData,
 		Attestation: attestationBytes,
 	}
 

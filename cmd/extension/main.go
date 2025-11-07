@@ -13,6 +13,10 @@ import (
 )
 
 func main() {
+	if settings.Mode == 1 {
+		settings.TestCodeHash = settings.TestCodeHash1 // set different test code hash. Applicable only in mode 1.
+	}
+
 	logger.Set(logger.Config{Console: true, Level: settings.LogLevel})
 
 	teeNode, err := node.Initialize(node.ZeroState{})
@@ -28,14 +32,23 @@ func main() {
 		logger.Fatalf("failed to load certificate: %v", err)
 	}
 
-	pc := settings.NewProxyConfigServer(settings.ProxyConfigureServerPort)
-	go pc.Serve() //nolint:errcheck
+	pc := settings.NewConfigServer(settings.ConfigureServerPort, teeNode)
+	go func() {
+		err := pc.Serve()
+		if err != nil {
+			logger.Errorf("config server: %w", err)
+		}
+	}()
 
-	extServer := server.NewExtensionServer(settings.ExtensionServerPort, teeNode, ws, pc.ProxyUrl)
+	extServer := server.NewExtensionServer(settings.ExtensionServerPort, teeNode, ws, pc.ProxyURL)
+	go func() {
+		err := extServer.Serve()
+		if err != nil {
+			logger.Errorf("extension server: %w", err)
+		}
+	}()
 
-	go extServer.Serve() //nolint:errcheck
-
-	r := router.NewExtensionRouter(teeNode, ws, ps, settings.ExtensionPort, pc.ProxyUrl)
+	r := router.NewExtensionRouter(teeNode, ws, ps, settings.ExtensionPort, pc.ProxyURL)
 
 	// Launch the json rpc server
 	r.Run(teeNode)

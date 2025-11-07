@@ -2,10 +2,17 @@ package node
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/utils"
 )
@@ -14,12 +21,25 @@ type Node struct {
 	teeID      common.Address // The ethereum address of the node, derived from the PrivateKey
 	privateKey *ecdsa.PrivateKey
 	state      State
+
+	initialOwner common.Address
+	extensionID  extensionID
+
+	lock sync.RWMutex
 }
 
 type Info struct {
 	TeeID     common.Address // The ethereum address of the node, derived from the PrivateKey
 	PublicKey types.PublicKey
 	State     State
+
+	InitialOwner common.Address
+	ExtensionID  common.Hash
+}
+
+type extensionID struct {
+	set   bool
+	value common.Hash
 }
 
 type State interface {
@@ -48,11 +68,22 @@ func Initialize(state State) (*Node, error) {
 
 	id := crypto.PubkeyToAddress(privKey.PublicKey)
 
-	return &Node{
+	n := &Node{
 		teeID:      id,
 		privateKey: privKey,
 		state:      state,
-	}, nil
+	}
+
+	err = n.initialOwnerFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	err = n.extensionIDFromEnv()
+	if err != nil {
+		return nil, err
+	}
+
+	return n, nil
 }
 
 // State retrieves the current serialized node state.
@@ -62,10 +93,15 @@ func (n *Node) State() (types.TeeState, error) {
 
 // Info returns the node metadata and current state.
 func (n *Node) Info() Info {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+
 	return Info{
-		TeeID:     n.teeID,
-		PublicKey: types.PubKeyToStruct(&n.privateKey.PublicKey),
-		State:     n.state,
+		TeeID:        n.teeID,
+		PublicKey:    types.PubKeyToStruct(&n.privateKey.PublicKey),
+		State:        n.state,
+		InitialOwner: n.initialOwner,
+		ExtensionID:  n.extensionID.value,
 	}
 }
 
@@ -92,4 +128,101 @@ func (n *Node) Decrypt(cipher []byte) ([]byte, error) {
 	}
 
 	return plaintext, nil
+}
+
+// SetOwner sets the initial owner of the node. It can only be set once.
+func (n *Node) SetOwner(owner common.Address) error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	zeroAddress := common.Address{}
+	if n.initialOwner != zeroAddress {
+		return errors.New("initial owner already set")
+	}
+
+	if owner == zeroAddress {
+		return errors.New("initial owner cannot be zero address")
+	}
+
+	n.initialOwner = owner
+
+	return nil
+}
+
+func (n *Node) initialOwnerFromEnv() error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	ownerB, isSet, err := bytesFromEnv(settings.InitialOwnerEnvVar)
+	if !isSet {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("invalid owner address: %w", err)
+	}
+	if len(ownerB) != 20 {
+		return fmt.Errorf("invalid owner address: wrong length %d", len(ownerB))
+	}
+
+	ownerAddr := common.BytesToAddress(ownerB)
+	n.initialOwner = ownerAddr
+	return nil
+}
+
+// SetExtensionID sets the extension ID of the node. It can only be set once.
+func (n *Node) SetExtensionID(id common.Hash) error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if n.extensionID.set {
+		return errors.New("extension ID already set")
+	}
+
+	n.extensionID.set = true
+	n.extensionID.value = id
+
+	return nil
+}
+
+func (n *Node) extensionIDFromEnv() error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if n.extensionID.set {
+		return errors.New("extension ID already set")
+	}
+
+	extIDB, isSet, err := bytesFromEnv(settings.ExtensionIDEnvVar)
+	if !isSet {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("invalid extension ID: %w", err)
+	}
+	if len(extIDB) != 32 {
+		return fmt.Errorf("invalid extension ID: wrong length %d", len(extIDB))
+	}
+
+	extID := common.BytesToHash(extIDB)
+	n.extensionID.set = true
+	n.extensionID.value = extID
+
+	return nil
+}
+
+func bytesFromEnv(varName string) ([]byte, bool, error) {
+	valueStr, exists := syscall.Getenv(varName)
+	if !exists {
+		return nil, false, fmt.Errorf("environment variable %s not set", varName)
+	}
+
+	valueStr, _ = strings.CutPrefix(valueStr, "0x")
+	valueStr, _ = strings.CutPrefix(valueStr, "0X")
+
+	valueB, err := hex.DecodeString(valueStr)
+	if err != nil {
+		return nil, true, fmt.Errorf("invalid hex in environment variable %s: %w", varName, err)
+	}
+
+	return valueB, true, nil
 }

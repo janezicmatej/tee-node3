@@ -4,8 +4,8 @@ go 1.25.1
 
 require (
 	github.com/ethereum/go-ethereum v1.16.3
-	github.com/flare-foundation/go-flare-common v1.2.1-0.20251009071915-ab8320f110cb
-	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/flare-foundation/go-flare-common v1.2.1-0.20251105145317-da99aba6b16b
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/go-tpm-tools v0.4.5
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1

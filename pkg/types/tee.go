@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/machineregistry"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/tee"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
 )
@@ -69,8 +70,42 @@ type TeeState struct {
 }
 
 type TeeInfoResponse struct {
-	TeeInfo     TeeInfo       `json:"teeInfo"`
-	Attestation hexutil.Bytes `json:"attestation"`
+	TeeInfo       TeeInfo       `json:"teeInfo"`
+	MachineData   MachineData   `json:"machineData"`
+	DataSignature hexutil.Bytes `json:"dataSignature"`
+	Attestation   hexutil.Bytes `json:"attestation"`
+}
+
+type MachineData struct {
+	ExtensionID  common.Hash    `json:"extensionId"`
+	InitialOwner common.Address `json:"initialOwner"`
+	CodeHash     common.Hash    `json:"codeHash"`
+	Platform     common.Hash    `json:"platform"`
+	PublicKey    PublicKey      `json:"publicKey"`
+}
+
+func (md *MachineData) Hash() (common.Hash, error) {
+	encoded := md.prepareForEncoding()
+	enc, err := structs.Encode(machineregistry.TeeMachineDataStructArg, encoded)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	hash := crypto.Keccak256Hash(enc)
+	return hash, nil
+}
+
+func (md *MachineData) prepareForEncoding() machineregistry.ITeeMachineRegistryTeeMachineData {
+	return machineregistry.ITeeMachineRegistryTeeMachineData{
+		ExtensionId:  md.ExtensionID.Big(),
+		InitialOwner: md.InitialOwner,
+		CodeHash:     md.CodeHash,
+		Platform:     md.Platform,
+		PublicKey: machineregistry.PublicKey{
+			X: md.PublicKey.X,
+			Y: md.PublicKey.Y,
+		},
+	}
 }
 
 type SignedTeeInfoResponse struct {
@@ -99,6 +134,14 @@ func DecodeTeeAttestationRequest(attReq []byte) (verification.ITeeVerificationTe
 	return unpacked, nil
 }
 
-type ConfigureProxyUrlRequest struct {
-	Url string
+type ConfigureProxyURLRequest struct {
+	URL string `json:"url"`
+}
+
+type ConfigureInitialOwnerRequest struct {
+	Owner common.Address `json:"owner"`
+}
+
+type ConfigureExtensionIDRequest struct {
+	ExtensionID common.Hash `json:"extensionId"`
 }

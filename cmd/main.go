@@ -32,10 +32,15 @@ func main() {
 	// 	logger.Fatalf("self attestation failed: %v", err)
 	// }
 
-	pc := settings.NewProxyConfigServer(settings.ProxyConfigureServerPort)
-	go pc.Serve() //nolint:errcheck
+	pc := settings.NewConfigServer(settings.ConfigureServerPort, teeNode)
+	go func() {
+		err := pc.Serve()
+		if err != nil {
+			logger.Errorf("config server: %w", err)
+		}
+	}()
 
-	r := router.NewPMWRouter(teeNode, ws, ps, pc.ProxyUrl)
+	r := router.NewPMWRouter(teeNode, ws, ps, pc.ProxyURL)
 
 	// Launch the json rpc server
 	r.Run(teeNode)
