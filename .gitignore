@@ -13,3 +13,5 @@ FlareTEE.docx
 *.out
 
 .env
+
+coverage*
