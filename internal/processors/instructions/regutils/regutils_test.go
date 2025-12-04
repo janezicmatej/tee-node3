@@ -140,8 +140,7 @@ func setupTEEAttestationProcessor(t *testing.T) (*Processor, instruction.DataFix
 		epochID   = uint32(3)
 	)
 
-	_, _, _, err := testutils.GenerateAndSetInitialPolicy(pStorage, numVoters, randSeed, epochID)
-	require.NoError(t, err)
+	testutils.GenerateAndSetInitialPolicy(t, pStorage, numVoters, randSeed, epochID)
 
 	processor := NewProcessor(testNode, pStorage)
 

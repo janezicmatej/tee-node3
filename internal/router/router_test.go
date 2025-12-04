@@ -76,8 +76,7 @@ func TestRouterInstructionActionRoutingThreshold(t *testing.T) {
 	teeNode, ps, ws := testutils.Setup(t)
 
 	numVoters, randSeed, epochID := 100, int64(12345), uint32(1)
-	_, _, providerPrivKeys, err := testutils.GenerateAndSetInitialPolicy(ps, numVoters, randSeed, epochID)
-	require.NoError(t, err)
+	_, _, providerPrivKeys := testutils.GenerateAndSetInitialPolicy(t, ps, numVoters, randSeed, epochID)
 
 	r := NewPMWRouter(teeNode, ws, ps, &settings.ProxyURLMutex{})
 
@@ -89,6 +88,7 @@ func TestRouterInstructionActionRoutingThreshold(t *testing.T) {
 	numAdmins := 3
 	adminPubKeys := make([]cwallet.PublicKey, numAdmins)
 	adminPrivKeys := make([]*ecdsa.PrivateKey, numAdmins)
+	var err error
 	for i := range numAdmins {
 		adminPrivKeys[i], err = crypto.GenerateKey()
 		require.NoError(t, err)
@@ -119,11 +119,10 @@ func TestRouterInstructionActionRoutingThreshold(t *testing.T) {
 	originalMessageEncoded, err := abi.Arguments{cwallet.MessageArguments[op.KeyGenerate]}.Pack(originalMessage)
 	require.NoError(t, err)
 
-	action, err := testutils.BuildMockInstructionAction(
-		op.Wallet, op.KeyGenerate, originalMessageEncoded, providerPrivKeys, teeID,
+	action := testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.KeyGenerate, originalMessageEncoded, providerPrivKeys, teeID,
 		epochID, nil, nil, nil, 0, types.Threshold, 1234567890,
 	)
-	require.NoError(t, err)
 
 	// Process the action
 	result := r.process(action, processorutils.Main)
@@ -408,7 +407,8 @@ func TestProcessDefaultInstruction(t *testing.T) {
 	r.RegisterDefaultInstruction(mockProcessor)
 
 	// Create an instruction action with an unregistered opType/opCommand
-	action, err := testutils.BuildMockInstructionAction(
+	action := testutils.BuildMockInstructionAction(
+		t,
 		op.Type("UnregisteredType"), op.Command("UnregisteredCommand"),
 		[]byte("test message"),
 		[]*ecdsa.PrivateKey{}, // Empty private keys for this test
@@ -418,7 +418,6 @@ func TestProcessDefaultInstruction(t *testing.T) {
 		types.Threshold,
 		1234567890,
 	)
-	require.NoError(t, err)
 
 	// Process the action
 	result := r.process(action, processorutils.Main)

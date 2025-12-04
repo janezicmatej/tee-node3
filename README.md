@@ -12,7 +12,8 @@
 
 # Flare TEE server node
 
-Flare TEE server node is a secure gRPC server implementation running inside a Trusted Execution Environment (TEE). It provides network managed wallets.
+Flare TEE server node is a secure server implementation running inside a Trusted Execution Environment (TEE).
+It provides protocol managed wallets as well as a base for extensions.
 
 [![API Reference](https://pkg.go.dev/badge/github.com/flare-foundation/tee-node)](https://pkg.go.dev/github.com/flare-foundation/tee-node?tab=doc)
 
@@ -21,12 +22,10 @@ Flare TEE server node is a secure gRPC server implementation running inside a Tr
 - Secure policy management within TEE
 - Policy signature verification and validation
 - Remote attestation with Google Cloud verification
-- gRPC interface for all operations
 
 ### Requirements
 
-- Go 1.24.4 or higher
-- Protocol Buffers compiler (buff package)
+- Go 1.25.1 or higher
 - Google Cloud Platform account (for attestation verification) (gcp confidential space)
 
 ## Local Setup and Installation
@@ -58,7 +57,6 @@ go build -o tee-node cmd/main.go
 ./tee-node
 ```
 
-2. The server will be available at `localhost:50051` (default) or the configured address
 
 ## Deploying the server in Google TEE
 

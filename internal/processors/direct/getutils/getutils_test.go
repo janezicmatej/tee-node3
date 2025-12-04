@@ -20,8 +20,7 @@ func TestKeyInfo(t *testing.T) {
 	testNode, pStorage, wStorage := testutils.Setup(t)
 
 	numVoters, randSeed, epochID := 100, int64(12345), uint32(1)
-	_, _, privKeys, err := testutils.GenerateAndSetInitialPolicy(pStorage, numVoters, randSeed, epochID)
-	require.NoError(t, err)
+	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(t, pStorage, numVoters, randSeed, epochID)
 
 	mockWalletID1 := common.HexToHash("0xabcdef")
 	mockKeyID1 := uint64(1)

@@ -6,7 +6,6 @@ require (
 	github.com/ethereum/go-ethereum v1.16.7
 	github.com/flare-foundation/go-flare-common v1.2.1-0.20251128132025-cddd560d9723
 	github.com/golang-jwt/jwt/v5 v5.3.0
-	github.com/google/go-tpm-tools v0.4.5
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621
@@ -30,11 +29,6 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
-	github.com/google/go-configfs-tsm v0.3.3 // indirect
-	github.com/google/go-sev-guest v0.13.0 // indirect
-	github.com/google/go-tdx-guest v0.3.2-0.20241009005452-097ee70d0843 // indirect
-	github.com/google/go-tpm v0.9.6 // indirect
-	github.com/google/logger v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect

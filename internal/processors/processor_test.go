@@ -44,7 +44,7 @@ func TestProcessorsEndToEnd(t *testing.T) {
 	numVoters, startingEpochID := 100, uint32(1)
 	finalEpochID := startingEpochID + 1
 
-	providerAddresses, providerPrivKeys, _ := testutils.GenerateRandomKeys(numVoters)
+	providerAddresses, providerPrivKeys, _ := testutils.GenerateRandomKeys(t, numVoters)
 
 	numAdmins := 3
 	adminPubKeys := make([]*ecdsa.PublicKey, numAdmins)
@@ -155,8 +155,7 @@ func initializePolicy(t *testing.T,
 	// initialize policy
 	randSeed := int64(12345)
 
-	nextPolicy, err := testutils.GenerateRandomPolicyData(startingEpochID+1, addresses, randSeed)
-	require.NoError(t, err)
+	nextPolicy := testutils.GenerateRandomPolicyData(t, startingEpochID+1, addresses, randSeed)
 
 	pubKeys := make([]types.PublicKey, len(privKeys))
 	for i, voter := range privKeys {
@@ -240,11 +239,9 @@ func generateWallet(
 	require.NoError(t, err)
 
 	// generate action sent when threshold reached
-	action, err := testutils.BuildMockInstructionAction(
-		op.Wallet, op.KeyGenerate, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
+	action := testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.KeyGenerate, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	response := <-actionResponseChan
@@ -263,11 +260,9 @@ func generateWallet(
 	require.Equal(t, newWallet.KeyID, walletExistenceProof.KeyId)
 
 	// generate action sent when voting closed
-	action, err = testutils.BuildMockInstructionAction(
-		op.Wallet, op.KeyGenerate, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.End, uint64(time.Now().Unix()),
+	action = testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.KeyGenerate, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.End, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	response = <-actionResponseChan
@@ -316,11 +311,9 @@ func signTransaction(
 	originalMessageEncoded, err := abi.Arguments{payment.MessageArguments[op.Pay]}.Pack(originalMessage)
 	require.NoError(t, err)
 
-	action, err := testutils.BuildMockInstructionAction(
-		op.XRP, op.Pay, originalMessageEncoded, privKeys, teeID, rewardEpochID, []byte{}, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
+	action := testutils.BuildMockInstructionAction(
+		t, op.XRP, op.Pay, originalMessageEncoded, privKeys, teeID, rewardEpochID, []byte{}, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse := <-actionResponseChan
@@ -329,11 +322,9 @@ func signTransaction(
 	require.NoError(t, err)
 
 	// generate action sent when voting closed
-	action, err = testutils.BuildMockInstructionAction(
-		op.XRP, op.Pay, originalMessageEncoded, privKeys, teeID, rewardEpochID, []byte{}, nil, nil, 0, types.End, uint64(time.Now().Unix()),
+	action = testutils.BuildMockInstructionAction(
+		t, op.XRP, op.Pay, originalMessageEncoded, privKeys, teeID, rewardEpochID, []byte{}, nil, nil, 0, types.End, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse = <-actionResponseChan
@@ -372,11 +363,9 @@ func deleteWallet(
 	originalMessageEncoded, err := abi.Arguments{wallet.MessageArguments[op.KeyDelete]}.Pack(originalMessage)
 	require.NoError(t, err)
 
-	action, err := testutils.BuildMockInstructionAction(
-		op.Wallet, op.KeyDelete, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
+	action := testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.KeyDelete, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse := <-actionResponseChan
@@ -386,11 +375,9 @@ func deleteWallet(
 	require.Error(t, err)
 
 	// generate action sent when voting closed
-	action, err = testutils.BuildMockInstructionAction(
-		op.Wallet, op.KeyDelete, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.End, uint64(time.Now().Unix()),
+	action = testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.KeyDelete, originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.End, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse = <-actionResponseChan
@@ -507,7 +494,7 @@ func recoverWallet(
 	teeEciesPubKey, err := utils.ECDSAPubKeyToECIES(teePubKey)
 	require.NoError(t, err)
 
-	additionalVariableMessages := make([]interface{}, 0)
+	additionalVariableMessages := make([][]byte, 0)
 	privKeys := make([]*ecdsa.PrivateKey, 0)
 	for i, privKey := range providersPrivKeys {
 		keySplit, err := backup.DecryptSplit(walletBackup.ProviderEncryptedParts.Splits[i], privKey)
@@ -556,13 +543,11 @@ func recoverWallet(
 		privKeys = append(privKeys, privKey)
 	}
 
-	action, err := testutils.BuildMockInstructionAction(
-		op.Wallet, op.KeyDataProviderRestore, originalMessageEncoded, privKeys, teeID,
+	action := testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.KeyDataProviderRestore, originalMessageEncoded, privKeys, teeID,
 		rewardEpochID, additionalFixedMessage, additionalVariableMessages, adminAddresses, adminsThreshold,
 		types.Threshold, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	response := <-actionResponseChan
@@ -580,13 +565,11 @@ func recoverWallet(
 	require.Equal(t, keyID, commonwallet.KeyID)
 
 	// generate action sent when voting closed
-	action, err = testutils.BuildMockInstructionAction(
-		op.Wallet, op.KeyDataProviderRestore, originalMessageEncoded, privKeys, teeID,
+	action = testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.KeyDataProviderRestore, originalMessageEncoded, privKeys, teeID,
 		rewardEpochID, additionalFixedMessage, additionalVariableMessages, adminAddresses, adminsThreshold,
 		types.End, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	response = <-actionResponseChan
@@ -633,11 +616,9 @@ func getTeeAttestation(
 	require.NoError(t, err)
 
 	// generate action sent when threshold reached
-	action, err := testutils.BuildMockInstructionAction(
-		op.Reg, op.TEEAttestation, originalMessageEncoded, privKeys, teeID, rewardEpochId, nil, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
+	action := testutils.BuildMockInstructionAction(
+		t, op.Reg, op.TEEAttestation, originalMessageEncoded, privKeys, teeID, rewardEpochId, nil, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse := <-actionResponseChan
@@ -656,11 +637,9 @@ func getTeeAttestation(
 	require.Equal(t, receivedTeeID, teeID)
 
 	// generate action sent when voting closed
-	action, err = testutils.BuildMockInstructionAction(
-		op.Reg, op.TEEAttestation, originalMessageEncoded, privKeys, teeID, rewardEpochId, nil, nil, nil, 0, types.End, uint64(time.Now().Unix()),
+	action = testutils.BuildMockInstructionAction(
+		t, op.Reg, op.TEEAttestation, originalMessageEncoded, privKeys, teeID, rewardEpochId, nil, nil, nil, 0, types.End, uint64(time.Now().Unix()),
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse = <-actionResponseChan
@@ -730,7 +709,7 @@ func ftdcProve(
 	ftdcMsgHash, _, _, err := ftdc.HashMessage(originalMessage, additionalFixedMessageEncoded, cosignerAddresses, cosignersThreshold, timestamp)
 	require.NoError(t, err)
 
-	variableMessages := make([]interface{}, 0)
+	variableMessages := make([][]byte, 0)
 	privKeys := make([]*ecdsa.PrivateKey, 0)
 	for _, privKey := range providerPrivKeys {
 		variableMessage, err := utils.Sign(ftdcMsgHash[:], privKey)
@@ -750,11 +729,11 @@ func ftdcProve(
 		privKeys = append(privKeys, privKey)
 	}
 
-	action, err := testutils.BuildMockInstructionAction(
-		op.FTDC, op.Prove, originalMessageEncoded, privKeys, teeID, rewardEpochID, additionalFixedMessageEncoded, variableMessages, cosignerAddresses, cosignersThreshold, types.Threshold, timestamp,
+	action := testutils.BuildMockInstructionAction(
+		t, op.FTDC, op.Prove, originalMessageEncoded, privKeys, teeID, rewardEpochID,
+		additionalFixedMessageEncoded, variableMessages, cosignerAddresses, cosignersThreshold,
+		types.Threshold, timestamp,
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse := <-actionResponseChan
@@ -777,11 +756,11 @@ func ftdcProve(
 	require.Equal(t, ftdcResponse.ResponseBody, additionalFixedMessageEncoded)
 
 	// generate action sent when voting closed
-	action, err = testutils.BuildMockInstructionAction(
-		op.FTDC, op.Prove, originalMessageEncoded, privKeys, teeID, rewardEpochID, additionalFixedMessageEncoded, variableMessages, cosignerAddresses, cosignersThreshold, types.End, timestamp,
+	action = testutils.BuildMockInstructionAction(
+		t, op.FTDC, op.Prove, originalMessageEncoded, privKeys, teeID, rewardEpochID,
+		additionalFixedMessageEncoded, variableMessages, cosignerAddresses, cosignersThreshold,
+		types.End, timestamp,
 	)
-	require.NoError(t, err)
-
 	actionInfoChan <- action
 
 	actionResponse = <-actionResponseChan

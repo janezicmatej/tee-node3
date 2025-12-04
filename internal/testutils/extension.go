@@ -1,4 +1,4 @@
-package exampleextension
+package testutils
 
 import (
 	"bytes"
@@ -16,15 +16,15 @@ import (
 )
 
 type DummyExtensionServer struct {
-	server  *http.Server
-	port    int
-	teePort int
-	version string
+	server       *http.Server
+	port         int
+	extenderPort int
+	version      string
 }
 
 // NewDummyExtensionServer spins up a mock extension server that exercises the
 // TEE-node interface for local development.
-func NewDummyExtensionServer(port, teePort int) *DummyExtensionServer {
+func NewDummyExtensionServer(port, extenderPort int) *DummyExtensionServer {
 	addr := fmt.Sprintf(":%d", port)
 
 	server := &http.Server{
@@ -32,10 +32,10 @@ func NewDummyExtensionServer(port, teePort int) *DummyExtensionServer {
 	}
 
 	e := DummyExtensionServer{
-		server:  server,
-		port:    port,
-		teePort: teePort,
-		version: "0.0.0-test",
+		server:       server,
+		port:         port,
+		extenderPort: extenderPort,
+		version:      "0.0.0-test",
 	}
 
 	e.registerRoutes()
@@ -161,7 +161,7 @@ func (d *DummyExtensionServer) processAction(action *types.Action) error {
 // mockPostActionResult sleeps and posts a mock action result to localhost:teePort/result.
 func (d *DummyExtensionServer) mockPostActionResult(action *types.Action) {
 	time.Sleep(50 * time.Millisecond)
-	url := fmt.Sprintf("http://localhost:%d/result", d.teePort)
+	url := fmt.Sprintf("http://localhost:%d/result", d.extenderPort)
 
 	result := d.mockActionResult(action)
 
@@ -208,7 +208,7 @@ func (d *DummyExtensionServer) mockActionResult(action *types.Action) types.Acti
 
 // Serve starts the dummy extension HTTP server.
 func (d *DummyExtensionServer) Serve() error {
-	logger.Infof("Starting dummy extension server on port %s", d.port)
+	logger.Infof("Starting dummy extension server on port %d", d.port)
 	return d.server.ListenAndServe()
 }
 

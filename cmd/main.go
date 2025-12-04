@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/flare-foundation/tee-node/internal/attestation"
 	"github.com/flare-foundation/tee-node/internal/router"
 	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/pkg/node"
@@ -22,15 +21,6 @@ func main() {
 	ws := wallets.InitializeStorage()
 	ps := policy.InitializeStorage()
 	logger.Info("tee node initialized")
-
-	err = attestation.SetGoogleCert()
-	if err != nil {
-		logger.Fatalf("failed to load certificate: %v", err)
-	}
-	// err = attestation.SelfAttest()
-	// if err != nil {
-	// 	logger.Fatalf("self attestation failed: %v", err)
-	// }
 
 	pc := settings.NewConfigServer(settings.ConfigureServerPort, teeNode)
 	go func() {
