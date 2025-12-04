@@ -23,25 +23,36 @@ func TestSignPaymentTransaction(t *testing.T) {
 	testNode, pStorage, wStorage := testutils.Setup(t)
 
 	numVoters, randSeed, epochID := 100, int64(12345), uint32(1)
-	_, _, privKeys, err := testutils.GenerateAndSetInitialPolicy(pStorage, numVoters, randSeed, epochID)
-	require.NoError(t, err, "generating")
+	_, _, privKeys := testutils.GenerateAndSetInitialPolicy(t, pStorage, numVoters, randSeed, epochID)
 
 	testutils.CreateMockWallet(t, testNode, pStorage, wStorage, mockWalletID, mockKeyID, epochID, []*ecdsa.PrivateKey{privKeys[0]}, nil)
 
 	instructionID, err := random.Hash()
 	require.NoError(t, err)
-	instructionDataFixed := instruction.DataFixed{
-		InstructionID:          instructionID,
-		TeeID:                  testNode.TeeID(),
-		RewardEpochID:          epochID,
-		OPType:                 op.XRP.Hash(),
-		OPCommand:              op.Pay.Hash(),
-		OriginalMessage:        testutils.BuildMockPaymentOriginalMessage(t, mockWalletID, testNode.TeeID(), mockKeyID),
+	iDataFixed := instruction.DataFixed{
+		InstructionID: instructionID,
+		TeeID:         testNode.TeeID(),
+		RewardEpochID: epochID,
+		OPType:        op.XRP.Hash(),
+		OPCommand:     op.Pay.Hash(),
+		OriginalMessage: testutils.BuildMockPaymentOriginalMessage(
+			t, mockWalletID, testNode.TeeID(), mockKeyID, 1000000000, "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh", "rrrrrrrrrrrrrrrrrrrrrhoLvTp",
+		),
 		AdditionalFixedMessage: nil,
 	}
 
 	proc := signutils.Processor{Storage: wStorage, Identifier: testNode}
 
-	_, _, err = proc.SignXRPLPayment(types.Threshold, &instructionDataFixed, nil, nil, nil)
-	require.NoError(t, err, "response")
+	t.Run("sign XRP payment", func(t *testing.T) {
+		_, _, err = proc.SignXRPLPayment(types.Threshold, &iDataFixed, nil, nil, nil)
+		require.NoError(t, err, "response")
+	})
+
+	iDataFixed.OriginalMessage = testutils.BuildMockPaymentOriginalMessage(
+		t, mockWalletID, testNode.TeeID(), mockKeyID, 0, "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh", "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+	)
+	t.Run("nullify XRP payment", func(t *testing.T) {
+		_, _, err = proc.SignXRPLPayment(types.Threshold, &iDataFixed, nil, nil, nil)
+		require.NoError(t, err, "response")
+	})
 }

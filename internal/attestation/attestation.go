@@ -1,7 +1,6 @@
 package attestation
 
 import (
-	"crypto/x509"
 	"encoding/hex"
 	"time"
 
@@ -12,20 +11,6 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/node"
 	"github.com/flare-foundation/tee-node/pkg/types"
 )
-
-var GoogleCert *x509.Certificate
-
-// SetGoogleCert loads the Google root certificate into memory for attestation
-// validation.
-func SetGoogleCert() error {
-	var err error
-	GoogleCert, err = attestation.LoadRootCert(settings.GoogleCertLoc)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // ConstructTEEInfoResponse creates a tee info attestation response for the given challenge
 func ConstructTEEInfoResponse(challenge common.Hash, nodeInfo *node.Info, initialID uint32, initialHash common.Hash, activeID uint32, activeHash common.Hash) (*types.TeeInfoResponse, error) {

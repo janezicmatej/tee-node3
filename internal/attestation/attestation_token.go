@@ -62,15 +62,3 @@ func GetGoogleAttestationToken(nonces []string, tokenType attestation.TokenType)
 
 	return tokenBytes, nil
 }
-
-// CreateAttestation returns the attestation token as a string for convenience.
-func CreateAttestation(nonces []string, tokenType attestation.TokenType) (string, error) {
-	var tokenBytes []byte
-	var err error
-	tokenBytes, err = GetGoogleAttestationToken(nonces, tokenType)
-	if err != nil {
-		return "", err
-	}
-
-	return string(tokenBytes), nil
-}

@@ -4,7 +4,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log"
 	"math/big"
+	"net/http"
 	"slices"
 	"testing"
 
@@ -40,6 +44,8 @@ func CreateMockWallet(
 	rewardEpochID uint32,
 	adminPrivKeys, cosignerPrivKeys []*ecdsa.PrivateKey,
 ) wallet.ITeeWalletKeyManagerKeyExistence {
+	t.Helper()
+
 	instructionID, err := random.Hash()
 	require.NoError(t, err)
 
@@ -103,16 +109,25 @@ func CreateMockWallet(
 
 // BuildMockPaymentOriginalMessage constructs a payment instruction payload for
 // use in tests.
-func BuildMockPaymentOriginalMessage(t *testing.T, mockWallet common.Hash, teeID common.Address, keyID uint64) []byte {
+func BuildMockPaymentOriginalMessage(
+	t *testing.T,
+	mockWallet common.Hash,
+	teeID common.Address,
+	keyID uint64,
+	amount int64,
+	sender, receiver string,
+) []byte {
+	t.Helper()
+
 	originalMessage := payment.ITeePaymentsPaymentInstructionMessage{
 		WalletId: mockWallet,
 		TeeIdKeyIdPairs: []payment.TeeIdKeyIdPair{{
 			TeeId: teeID,
 			KeyId: keyID,
 		}},
-		SenderAddress:    "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
-		RecipientAddress: "rrrrrrrrrrrrrrrrrrrrrhoLvTp",
-		Amount:           big.NewInt(1000000000),
+		SenderAddress:    sender,
+		RecipientAddress: receiver,
+		Amount:           big.NewInt(amount),
 		Fee:              big.NewInt(1000),
 		PaymentReference: [32]byte{},
 		Nonce:            uint64(0),
@@ -122,12 +137,14 @@ func BuildMockPaymentOriginalMessage(t *testing.T, mockWallet common.Hash, teeID
 
 	originalMessageEncoded, err := abi.Arguments{payment.MessageArguments[op.Pay]}.Pack(originalMessage)
 	require.NoError(t, err)
+
 	return originalMessageEncoded
 }
 
 // BuildMockInstructionAction assembles an instruction action with the provided
 // signing keys and payload for use in tests.
 func BuildMockInstructionAction(
+	t *testing.T,
 	opType op.Type,
 	opCommand op.Command,
 	originalMessage []byte,
@@ -135,16 +152,17 @@ func BuildMockInstructionAction(
 	teeID common.Address,
 	rewardEpochID uint32,
 	additionalFixedMessageRaw any,
-	variableMessages []any,
+	variableMessages [][]byte,
 	cosigners []common.Address,
 	cosignersThreshold uint64,
 	submissionTag types.SubmissionTag,
 	timestamp uint64,
-) (*types.Action, error) {
+) *types.Action {
+	t.Helper()
+
 	instructionID, err := random.Hash()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
+
 	var additionalFixedMessage []byte
 	switch additionalFixedMessageRaw := additionalFixedMessageRaw.(type) {
 	case nil:
@@ -157,9 +175,7 @@ func BuildMockInstructionAction(
 		additionalFixedMessage = additionalFixedMessageRaw[:]
 	default:
 		additionalFixedMessage, err = json.Marshal(additionalFixedMessageRaw)
-		if err != nil {
-			return nil, err
-		}
+		require.NoError(t, err)
 	}
 
 	instructionDataFixed := instruction.DataFixed{
@@ -175,9 +191,7 @@ func BuildMockInstructionAction(
 		CosignersThreshold:     cosignersThreshold,
 	}
 	instructionDataFixedEncoded, err := json.Marshal(instructionDataFixed)
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
 
 	signatures := make([]hexutil.Bytes, len(privKeys))
 	var additionalVariableMessages []hexutil.Bytes
@@ -191,30 +205,17 @@ func BuildMockInstructionAction(
 			AdditionalVariableMessage: []byte(""),
 		}
 		if len(variableMessages) != 0 {
-			switch msg := variableMessages[i].(type) {
-			case []byte:
-				instructionData.AdditionalVariableMessage = msg
-				additionalVariableMessages[i] = instructionData.AdditionalVariableMessage
-			default:
-				instructionData.AdditionalVariableMessage, err = json.Marshal(msg)
-				if err != nil {
-					return nil, err
-				}
-				additionalVariableMessages[i] = instructionData.AdditionalVariableMessage
-			}
+			instructionData.AdditionalVariableMessage = variableMessages[i]
+			additionalVariableMessages[i] = instructionData.AdditionalVariableMessage
 		}
 		signatures[i], err = sign(&instructionData, privKey)
-		if err != nil {
-			return nil, err
-		}
+		require.NoError(t, err)
 	}
 
 	timestamps := make([]uint64, len(signatures))
 	for i := range timestamps {
 		randInt, err := rand.Int(rand.Reader, big.NewInt(10000000))
-		if err != nil {
-			return nil, err
-		}
+		require.NoError(t, err)
 		timestamps[i] = randInt.Uint64()
 	}
 
@@ -233,11 +234,13 @@ func BuildMockInstructionAction(
 		Signatures:                 signatures,
 	}
 
-	return &action, nil
+	return &action
 }
 
 // BuildMockDirectAction fabricates a direct action with a random ID for tests.
 func BuildMockDirectAction(t *testing.T, opType op.Type, opCommand op.Command, messageRaw any) *types.Action {
+	t.Helper()
+
 	var message []byte
 	var err error
 	switch messageRaw := messageRaw.(type) {
@@ -284,4 +287,25 @@ func sign(r *instruction.Data, privKey *ecdsa.PrivateKey) ([]byte, error) {
 	}
 
 	return signature, nil
+}
+
+func MockExtenderServerResult(t *testing.T, extenderPort int, actionResponseChan chan *types.ActionResult) {
+	t.Helper()
+
+	router := http.NewServeMux()
+
+	router.HandleFunc("POST /result", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var actionResponse types.ActionResult
+		err = json.Unmarshal(body, &actionResponse)
+		require.NoError(t, err)
+
+		actionResponseChan <- &actionResponse
+		err = r.Body.Close()
+		require.NoError(t, err)
+	})
+
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", extenderPort), router))
 }

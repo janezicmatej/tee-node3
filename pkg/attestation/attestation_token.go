@@ -15,8 +15,8 @@ import (
 type TokenType string
 
 const PKITokenType = TokenType("PKI")
-const OIDCTokenType = TokenType("OIDC")
-const MagicPass = "magic_pass"
+const OIDCTokenType = TokenType("OIDC") // currently not used
+const MagicPass = "magic_pass"          // only for testing outside of the google cloud
 
 // GoogleTeeClaims represents the claims present in a Google Cloud TEE attestation JWT.
 //

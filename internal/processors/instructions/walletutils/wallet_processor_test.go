@@ -83,7 +83,7 @@ func setupKeyGenerateTest(t *testing.T) *keyGenerateTestSetup {
 	}
 
 	numVoters, randSeed, epochID := 100, int64(12345), uint32(1)
-	_, _, _, err = testutils.GenerateAndSetInitialPolicy(pStorage, numVoters, randSeed, epochID)
+	testutils.GenerateAndSetInitialPolicy(t, pStorage, numVoters, randSeed, epochID)
 	require.NoError(t, err)
 
 	return &keyGenerateTestSetup{
@@ -316,8 +316,7 @@ func setupKeyDeleteTest(t *testing.T) *keyDeleteTestSetup {
 	testNode, pStorage, wStorage := testutils.Setup(t)
 
 	numVoters, randSeed, epochID := 50, int64(6789), uint32(3)
-	_, _, _, err := testutils.GenerateAndSetInitialPolicy(pStorage, numVoters, randSeed, epochID)
-	require.NoError(t, err)
+	testutils.GenerateAndSetInitialPolicy(t, pStorage, numVoters, randSeed, epochID)
 
 	adminPrivKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -509,12 +508,12 @@ func setupKeyDataProviderRestoreTest(t *testing.T) *keyDataProviderRestoreTestSe
 		epochID   = uint32(11)
 	)
 
-	initialPolicy, _, voterPrivKeys, err := testutils.GenerateAndSetInitialPolicy(pStorage, numVoters, randSeed, epochID)
-	require.NoError(t, err)
+	initialPolicy, _, voterPrivKeys := testutils.GenerateAndSetInitialPolicy(t, pStorage, numVoters, randSeed, epochID)
 
 	// Create 3 admins with threshold of 3
 	numAdmins := 3
 	adminPrivKeys := make([]*ecdsa.PrivateKey, numAdmins)
+	var err error
 	for i := range numAdmins {
 		adminPrivKeys[i], err = crypto.GenerateKey()
 		require.NoError(t, err)

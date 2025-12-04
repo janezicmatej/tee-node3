@@ -5,11 +5,11 @@ import (
 	"log"
 	"net/http"
 
-	exampleextension "github.com/flare-foundation/tee-node/internal/extension/example_extension"
+	"github.com/flare-foundation/tee-node/internal/testutils"
 )
 
 func main() {
-	server := exampleextension.NewDummyExtensionServer(8888, 8889)
+	server := testutils.NewDummyExtensionServer(8888, 8889)
 
 	if err := server.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("Server error: %v", err)

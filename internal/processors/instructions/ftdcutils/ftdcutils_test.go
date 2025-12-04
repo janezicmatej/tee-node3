@@ -50,8 +50,7 @@ func setupFTDCProveTest(t *testing.T) *ftdcProveTestSetup {
 	testNode, pStorage, _ := testutils.Setup(t)
 
 	numVoters, randSeed, epochID := 100, int64(12345), uint32(1)
-	policy, signers, privKeys, err := testutils.GenerateAndSetInitialPolicy(pStorage, numVoters, randSeed, epochID)
-	require.NoError(t, err)
+	policy, signers, privKeys := testutils.GenerateAndSetInitialPolicy(t, pStorage, numVoters, randSeed, epochID)
 
 	// Setup cosigners (use first 10 providers as cosigners for simplicity)
 	numCosigners := 10
@@ -435,13 +434,11 @@ func TestFTDCProve_PolicyWindow_LastTwoEpochs(t *testing.T) {
 	epoch2 := setup.epochID + 1
 	epoch3 := setup.epochID + 2
 
-	policy2, err := testutils.GenerateRandomPolicyData(epoch2, setup.signers, 2222)
-	require.NoError(t, err)
-	err = setup.pStorage.SetActiveSigningPolicy(policy2)
+	policy2 := testutils.GenerateRandomPolicyData(t, epoch2, setup.signers, 2222)
+	err := setup.pStorage.SetActiveSigningPolicy(policy2)
 	require.NoError(t, err)
 
-	policy3, err := testutils.GenerateRandomPolicyData(epoch3, setup.signers, 3333)
-	require.NoError(t, err)
+	policy3 := testutils.GenerateRandomPolicyData(t, epoch3, setup.signers, 3333)
 	err = setup.pStorage.SetActiveSigningPolicy(policy3)
 	require.NoError(t, err)
 

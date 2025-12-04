@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	exampleextension "github.com/flare-foundation/tee-node/internal/extension/example_extension"
 	"github.com/flare-foundation/tee-node/internal/extension/server"
 	"github.com/flare-foundation/tee-node/internal/router"
 	"github.com/flare-foundation/tee-node/internal/settings"
+	"github.com/flare-foundation/tee-node/internal/testutils"
 	"github.com/flare-foundation/tee-node/pkg/node"
 	"github.com/flare-foundation/tee-node/pkg/policy"
 	"github.com/flare-foundation/tee-node/pkg/wallets"
@@ -108,7 +108,7 @@ func StartTestServerExtension(t *testing.T, configPort, extenderPort, extensionP
 // StartExampleExtension launches the dummy extension server on the configured
 // ports.
 func StartExampleExtension(extenderPort, extensionPort int) {
-	server := exampleextension.NewDummyExtensionServer(extensionPort, extenderPort)
+	server := testutils.NewDummyExtensionServer(extensionPort, extenderPort)
 
 	server.Serve() //nolint:errcheck,gosec
 }
