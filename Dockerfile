@@ -1,6 +1,9 @@
 # Build stage  
 FROM golang:1.25.1-alpine AS builder  
 
+ARG SOURCE_DATE_EPOCH
+ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
+
 # Install git and certificates (needed for private repos and some dependencies)  
 RUN apk add --no-cache git ca-certificates tzdata  
 
@@ -23,6 +26,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server cmd/main.go
 
 # Final stage  
 FROM alpine:latest
+
+ARG SOURCE_DATE_EPOCH
+ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
 
 # Import certificates from builder  
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/  
