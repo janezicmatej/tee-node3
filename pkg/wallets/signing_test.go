@@ -125,7 +125,7 @@ func encodeToSign(tx *types.DynamicFeeTx, chainID *big.Int) ([]byte, error) {
 }
 
 func TestXRPLSigning(t *testing.T) {
-	wal := setupTestWallet(t, XRPAlgo)
+	wal := setupTestWallet(t, XRPSignAlgo)
 
 	originalMessage := payment.ITeePaymentsPaymentInstructionMessage{
 		WalletId: wal.WalletID,

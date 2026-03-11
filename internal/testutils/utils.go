@@ -97,9 +97,8 @@ func GenerateRandomPolicyData(t *testing.T, rewardEpochID uint32, voters []commo
 
 	threshold := uint16(TotalWeight / 2)
 	randSeed := big.NewInt(rgen.Int63())
-	weights := []uint16{}
-
 	normalizedWeights := randomNormalizedArray(len(voters), seed)
+	weights := make([]uint16, 0, len(normalizedWeights))
 	for _, w := range normalizedWeights {
 		weights = append(weights, uint16(w*TotalWeight))
 	}

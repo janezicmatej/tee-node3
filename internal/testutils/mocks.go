@@ -70,7 +70,7 @@ func CreateMockWallet(
 		WalletId:    walletID,
 		KeyId:       keyID,
 		KeyType:     wallets.XRPType,
-		SigningAlgo: wallets.XRPAlgo,
+		SigningAlgo: wallets.XRPSignAlgo,
 		ConfigConstants: wallet.ITeeWalletKeyManagerKeyConfigConstants{
 			AdminsPublicKeys:   adminPubKeys,
 			AdminsThreshold:    uint64(len(adminPubKeys)),

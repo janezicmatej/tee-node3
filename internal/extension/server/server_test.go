@@ -93,7 +93,7 @@ func TestGetKeyInfo(t *testing.T) {
 	go extServer.Serve()                        //nolint:errcheck
 	defer extServer.Close(context.Background()) //nolint:errcheck
 
-	testWallet := setupTestWallet(t, extServer.wStorage, wallets.XRPAlgo)
+	testWallet := setupTestWallet(t, extServer.wStorage, wallets.XRPSignAlgo)
 	wID, kID := testWallet.WalletID, testWallet.KeyID
 	url := fmt.Sprintf("http://localhost:%d/key-info/%s/%d", port, wID.Hex(), kID)
 
@@ -129,7 +129,7 @@ func TestSignWithKey(t *testing.T) {
 	go server.Serve()                        //nolint:errcheck
 	defer server.Close(context.Background()) //nolint:errcheck
 
-	wallet := setupTestWallet(t, server.wStorage, wallets.XRPAlgo)
+	wallet := setupTestWallet(t, server.wStorage, wallets.XRPSignAlgo)
 	wID, kID := wallet.WalletID, wallet.KeyID
 
 	// Create test message
@@ -213,7 +213,7 @@ func TestDecryptWithKey(t *testing.T) {
 	go server.Serve()                        //nolint:errcheck
 	defer server.Close(context.Background()) //nolint:errcheck
 
-	wallet := setupTestWallet(t, server.wStorage, wallets.XRPAlgo)
+	wallet := setupTestWallet(t, server.wStorage, wallets.XRPSignAlgo)
 	walletID, keyID := wallet.WalletID, wallet.KeyID
 
 	// Create test encrypted message (this is a dummy encrypted message for testing)

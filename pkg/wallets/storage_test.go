@@ -21,7 +21,7 @@ func createTestWalletForStorage() *Wallet {
 		KeyID:       777,
 		PrivateKey:  []byte{1, 2, 3, 4, 5},
 		KeyType:     XRPType,
-		SigningAlgo: XRPAlgo,
+		SigningAlgo: XRPSignAlgo,
 		Status:      &WalletStatus{Nonce: 1, StatusCode: 2, PausingNonce: common.HexToHash("0xaa")},
 	}
 }

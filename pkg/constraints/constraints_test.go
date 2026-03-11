@@ -104,7 +104,7 @@ func TestCheckSize(t *testing.T) {
 
 func TestCheckSizeVariableMessages(t *testing.T) {
 	makeVarMsgs := func(nsizes ...int) []hexutil.Bytes {
-		var v []hexutil.Bytes
+		v := make([]hexutil.Bytes, 0, len(nsizes))
 		for _, sz := range nsizes {
 			v = append(v, make([]byte, sz))
 		}

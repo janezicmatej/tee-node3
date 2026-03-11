@@ -133,7 +133,7 @@ func (s *keyGenerateTestSetup) defaultKeyGenerateMessage() cwallet.ITeeWalletKey
 		WalletId:    s.walletID,
 		KeyId:       s.keyID,
 		KeyType:     wallets.XRPType,
-		SigningAlgo: wallets.XRPAlgo,
+		SigningAlgo: wallets.XRPSignAlgo,
 		ConfigConstants: cwallet.ITeeWalletKeyManagerKeyConfigConstants{
 			AdminsPublicKeys:   s.adminWalletPublicKeys,
 			AdminsThreshold:    uint64(len(s.adminWalletPublicKeys)),
@@ -160,7 +160,7 @@ func TestKeyGenerate(t *testing.T) {
 	require.Equal(t, setup.keyID, walletExistenceProof.KeyId)
 	require.Equal(t, "0", walletExistenceProof.Nonce.String())
 	require.Equal(t, false, walletExistenceProof.Restored)
-	require.Equal(t, [32]byte(wallets.XRPAlgo), walletExistenceProof.SigningAlgo)
+	require.Equal(t, [32]byte(wallets.XRPSignAlgo), walletExistenceProof.SigningAlgo)
 	require.Equal(t, [32]byte(wallets.XRPType), walletExistenceProof.KeyType)
 
 	setup.wStorage.RLock()
@@ -1169,8 +1169,8 @@ func TestKeyDataProviderRestoreUnauthorizedSigner(t *testing.T) {
 
 	// Create unauthorized signers (not in voter set and not admins)
 	unauthorizedPrivKeys := make([]*ecdsa.PrivateKey, 3)
-	unauthorizedSigners := make([]common.Address, 3)
-	variableMessages := make([]hexutil.Bytes, 3)
+	unauthorizedSigners := make([]common.Address, 3, 3+len(adminSigners))
+	variableMessages := make([]hexutil.Bytes, 3, 3+len(adminSigners))
 
 	for i := range 3 {
 		var err error

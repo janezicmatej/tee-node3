@@ -79,7 +79,7 @@ func TestWallet(t *testing.T) {
 		common.HexToHash("0x01"),
 		1,
 		XRPType,
-		XRPAlgo,
+		XRPSignAlgo,
 		adminPubKeys,
 		[]common.Address{},
 	)
@@ -143,7 +143,7 @@ func TestBackupID(t *testing.T) {
 		KeyID:         0,
 		PublicKey:     types.PubKeyToBytes(&prv.PublicKey),
 		KeyType:       XRPType,
-		SigningAlgo:   XRPAlgo,
+		SigningAlgo:   XRPSignAlgo,
 		RewardEpochID: 0,
 		RandomNonce:   common.HexToHash("0x1000000000000000000000000000000000000000000000000000000000000001"),
 	}
@@ -154,7 +154,7 @@ func TestBackupID(t *testing.T) {
 		KeyID:         0,
 		PublicKey:     types.PubKeyToBytes(&prv.PublicKey),
 		KeyType:       XRPType,
-		SigningAlgo:   XRPAlgo,
+		SigningAlgo:   XRPSignAlgo,
 		RewardEpochID: 0,
 		RandomNonce:   common.HexToHash("0x1000000000000000000000000000000000000000000000000000000000000001"),
 	}
@@ -296,7 +296,7 @@ func TestCheckKeyGenerate(t *testing.T) {
 		common.HexToHash("0x11"),
 		42,
 		EVMType,
-		EVMAlgo,
+		EVMSignAlgo,
 		[]wallet.PublicKey{adminPubKey},
 		[]common.Address{common.HexToAddress("0x1")},
 	)
@@ -358,7 +358,7 @@ func TestParseKeyGenerate(t *testing.T) {
 			common.HexToHash("0xADD"),
 			110,
 			EVMType,
-			EVMAlgo,
+			EVMSignAlgo,
 			[]wallet.PublicKey{{X: [32]byte{1}, Y: [32]byte{2}}},
 			[]common.Address{common.HexToAddress("0xF1")},
 		)
@@ -401,7 +401,7 @@ func TestExtractKeyExistence(t *testing.T) {
 			common.HexToHash("0x42"),
 			31337,
 			EVMType,
-			EVMAlgo,
+			EVMSignAlgo,
 			adminsPubKeys,
 			[]common.Address{},
 		)
@@ -496,7 +496,7 @@ func TestParseKeyDataProviderRestore(t *testing.T) {
 				WalletId:      common.HexToHash("0x01"),
 				KeyId:         1,
 				KeyType:       EVMType,
-				SigningAlgo:   EVMAlgo,
+				SigningAlgo:   EVMSignAlgo,
 				PublicKey:     []byte{0x12, 0x34, 0x56},
 				RewardEpochId: 1,
 				RandomNonce:   common.HexToHash("0xfeedfeed"),

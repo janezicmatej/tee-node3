@@ -22,6 +22,7 @@ import (
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/connector"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
+	vrfstruct "github.com/flare-foundation/go-flare-common/pkg/tee/structs/vrf"
 
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/flare-foundation/tee-node/internal/router"
@@ -30,6 +31,7 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/ftdc"
 	"github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/flare-foundation/tee-node/pkg/wallets/backup"
+	"github.com/flare-foundation/tee-node/pkg/wallets/vrf"
 
 	"github.com/flare-foundation/tee-node/pkg/wallets"
 
@@ -95,8 +97,13 @@ func TestProcessorsEndToEnd(t *testing.T) {
 	var walletID = common.HexToHash("0xabcdef")
 	var keyID = uint64(1)
 	walletProof := generateWallet(t, mainActionInfoChan, actionResponseChan, teeID, walletID, keyID,
-		providerPrivKeys, adminWalletPublicKeys, finalEpochID, wStorage)
+		providerPrivKeys, adminWalletPublicKeys, finalEpochID, wStorage, wallets.XRPType, wallets.XRPSignAlgo)
 	require.False(t, walletProof.Restored)
+
+	var vrfKeyID = uint64(2)
+	randWalletProof := generateWallet(t, mainActionInfoChan, actionResponseChan, teeID, walletID, vrfKeyID,
+		providerPrivKeys, adminWalletPublicKeys, finalEpochID, wStorage, wallets.EVMType, wallets.VRFAlgo)
+	proveVRFRandomness(t, mainActionInfoChan, actionResponseChan, teeID, walletID, vrfKeyID, randWalletProof.PublicKey, providerPrivKeys, finalEpochID)
 
 	signTransaction(t, mainActionInfoChan, actionResponseChan, teeID, walletID, keyID, providerPrivKeys, finalEpochID)
 
@@ -219,15 +226,18 @@ func generateWallet(
 	privKeys []*ecdsa.PrivateKey,
 	adminWalletPublicKeys []wallet.PublicKey,
 	rewardEpochID uint32,
-	wStorage *wallets.Storage) *wallet.ITeeWalletKeyManagerKeyExistence {
+	wStorage *wallets.Storage,
+	keyType common.Hash,
+	signingAlgo common.Hash,
+) *wallet.ITeeWalletKeyManagerKeyExistence {
 	t.Helper()
 
 	originalMessage := wallet.ITeeWalletKeyManagerKeyGenerate{
 		TeeId:       teeID,
 		WalletId:    walletID,
 		KeyId:       keyID,
-		KeyType:     wallets.XRPType,
-		SigningAlgo: wallets.XRPAlgo,
+		KeyType:     keyType,
+		SigningAlgo: signingAlgo,
 		ConfigConstants: wallet.ITeeWalletKeyManagerKeyConfigConstants{
 			AdminsPublicKeys:   adminWalletPublicKeys,
 			AdminsThreshold:    uint64(len(adminWalletPublicKeys)),
@@ -281,6 +291,74 @@ func generateWallet(
 	require.NoError(t, err)
 
 	return walletExistenceProof
+}
+
+func proveVRFRandomness(
+	t *testing.T,
+	actionInfoChan chan *types.Action,
+	actionResponseChan chan *types.ActionResponse,
+	teeID common.Address,
+	walletID [32]byte,
+	keyID uint64,
+	publicKey []byte,
+	privKeys []*ecdsa.PrivateKey,
+	rewardEpochID uint32,
+) {
+	t.Helper()
+
+	pk, err := types.ParsePubKeyBytes(publicKey)
+	require.NoError(t, err)
+
+	nonce := make([]byte, 32)
+	_, err = rand.Read(nonce)
+	require.NoError(t, err)
+
+	originalMessage := vrfstruct.ITeeVrfVrfInstructionMessage{
+		WalletId: walletID,
+		KeyId:    keyID,
+		Nonce:    nonce,
+	}
+	originalMessageEncoded, err := abi.Arguments{vrfstruct.MessageArguments[op.VRF]}.Pack(originalMessage)
+	require.NoError(t, err)
+
+	action := testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.Command("VRF"), originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
+	)
+	actionInfoChan <- action
+
+	actionResponse := <-actionResponseChan
+	require.Equal(t, uint8(1), actionResponse.Result.Status, actionResponse.Result.Log)
+	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.Data), actionResponse.Signature, teeID)
+	require.NoError(t, err)
+
+	var proveResp types.ProveRandomnessResponse
+	err = json.Unmarshal(actionResponse.Result.Data, &proveResp)
+	require.NoError(t, err)
+	require.Equal(t, common.Hash(walletID), proveResp.WalletID)
+	require.Equal(t, keyID, proveResp.KeyID)
+	require.Equal(t, nonce, []byte(proveResp.Nonce))
+
+	err = vrf.VerifyRandomness(&proveResp.Proof, pk, nonce)
+	require.NoError(t, err)
+	randomness, err := proveResp.Proof.RandomnessFromProof()
+	require.NoError(t, err)
+	require.NotEqual(t, common.Hash{}, randomness)
+
+	action = testutils.BuildMockInstructionAction(
+		t, op.Wallet, op.Command("VRF"), originalMessageEncoded, privKeys, teeID, rewardEpochID, nil, nil, nil, 0, types.End, uint64(time.Now().Unix()),
+	)
+	actionInfoChan <- action
+
+	actionResponse = <-actionResponseChan
+	require.Equal(t, uint8(1), actionResponse.Result.Status, actionResponse.Result.Log)
+	err = utils.VerifySignature(crypto.Keccak256(actionResponse.Result.Data), actionResponse.Signature, teeID)
+	require.NoError(t, err)
+
+	var signerSequence types.RewardingData
+	err = json.Unmarshal(actionResponse.Result.Data, &signerSequence)
+	require.NoError(t, err)
+	err = utils.VerifySignature(signerSequence.VoteSequence.VoteHash[:], signerSequence.Signature, teeID)
+	require.NoError(t, err)
 }
 
 func signTransaction(
@@ -480,7 +558,7 @@ func recoverWallet(
 			WalletId:      walletID,
 			KeyId:         keyID,
 			KeyType:       wallets.XRPType,
-			SigningAlgo:   wallets.XRPAlgo,
+			SigningAlgo:   wallets.XRPSignAlgo,
 			PublicKey:     walletBackup.PublicKey,
 			RewardEpochId: rewardEpochID,
 			RandomNonce:   walletBackup.RandomNonce,

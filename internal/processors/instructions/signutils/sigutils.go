@@ -30,7 +30,7 @@ func loadPrivateKeys(storage *wallets.Storage, walletID [32]byte, keyIDs []uint6
 		if key.KeyType != wallets.XRPType {
 			return nil, errors.New("key type does not allow the action")
 		}
-		if key.SigningAlgo != wallets.XRPAlgo {
+		if key.SigningAlgo != wallets.XRPSignAlgo {
 			return nil, errors.New("key's signing algorithm does not allow the action")
 		}
 		if err := processorutils.CheckMatchingCosigners(dataFixed.Cosigners, key.Cosigners, dataFixed.CosignersThreshold, key.CosignersThreshold); err != nil {

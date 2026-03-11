@@ -28,7 +28,7 @@ const DataProvidersThreshold = uint64(666)
 // key that is split, but remains to be signed by the TEE.
 func BackupWallet(wallet *wallets.Wallet, providerPubKeys []*ecdsa.PublicKey, signingPolicyWeights []uint16, rewardEpochID uint32, teeID common.Address, normalizationParam uint16, dataProviderThreshold uint64) (*backup.WalletBackup, error) {
 	switch wallet.SigningAlgo {
-	case wallets.XRPAlgo, wallets.EVMAlgo:
+	case wallets.XRPSignAlgo, wallets.EVMSignAlgo:
 		// continue
 	default:
 		return nil, errors.New("unsupported signing algorithm")

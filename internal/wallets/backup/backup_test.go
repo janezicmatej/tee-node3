@@ -44,7 +44,7 @@ func TestBackupAndRecover(t *testing.T) {
 		KeyID:       idPair.KeyID,
 		PrivateKey:  common.BigToHash(sk.D).Bytes(),
 		KeyType:     wallets.XRPType,
-		SigningAlgo: wallets.XRPAlgo,
+		SigningAlgo: wallets.XRPSignAlgo,
 		Restored:    false,
 
 		AdminPublicKeys:    adminPubKeys,
@@ -127,7 +127,7 @@ func TestRecoverWithMissingShares(t *testing.T) {
 		KeyID:       idPair.KeyID,
 		PrivateKey:  common.BigToHash(sk.D).Bytes(),
 		KeyType:     wallets.XRPType,
-		SigningAlgo: wallets.XRPAlgo,
+		SigningAlgo: wallets.XRPSignAlgo,
 		Restored:    false,
 
 		AdminPublicKeys:    adminPubKeys,

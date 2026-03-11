@@ -106,7 +106,7 @@ func TestRouterInstructionActionRoutingThreshold(t *testing.T) {
 		WalletId:    walletID,
 		KeyId:       keyID,
 		KeyType:     wallets.XRPType,
-		SigningAlgo: wallets.XRPAlgo,
+		SigningAlgo: wallets.XRPSignAlgo,
 		ConfigConstants: cwallet.ITeeWalletKeyManagerKeyConfigConstants{
 			AdminsPublicKeys:   adminPubKeys,
 			AdminsThreshold:    1,
