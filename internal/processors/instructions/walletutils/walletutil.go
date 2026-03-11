@@ -49,7 +49,7 @@ func (p *Processor) keyRestoreDataCheck(
 	if crypto.PubkeyToAddress(*teePubKey) != teeID {
 		return nil, 0, nil, errors.New("teeID does not match given public key")
 	}
-	if !slices.Contains(wallets.SigningAlgos, restoreRequest.BackupId.SigningAlgo) {
+	if !slices.Contains(wallets.Algos, restoreRequest.BackupId.SigningAlgo) {
 		return nil, 0, nil, errors.New("signing algorithm not supported")
 	}
 

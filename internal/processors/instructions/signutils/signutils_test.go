@@ -256,7 +256,7 @@ func requireSignedByWallets(t *testing.T, txs types.XRPSignResponse, wals []*wal
 // Basic XRP Payment Signing Success
 func TestSignXRPLBasicSuccess(t *testing.T) {
 	setup := setupSignXRPLTest(t)
-	wal := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPAlgo, []common.Address{}, 0)
+	wal := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPSignAlgo, []common.Address{}, 0)
 
 	proxyMux, responses := startMockResultServer(t)
 	proc := signutils.NewProcessor(setup.testNode, setup.wStorage, proxyMux)
@@ -282,8 +282,8 @@ func TestSignXRPLBasicSuccess(t *testing.T) {
 // Multi-Key Multisig Signing
 func TestSignXRPLMultiKeyMultisig(t *testing.T) {
 	setup := setupSignXRPLTest(t)
-	wal1 := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPAlgo, []common.Address{}, 0)
-	wal2 := setup.createWallet(t, 2, wallets.XRPType, wallets.XRPAlgo, []common.Address{}, 0)
+	wal1 := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPSignAlgo, []common.Address{}, 0)
+	wal2 := setup.createWallet(t, 2, wallets.XRPType, wallets.XRPSignAlgo, []common.Address{}, 0)
 
 	proxyMux, responses := startMockResultServer(t)
 	proc := signutils.NewProcessor(setup.testNode, setup.wStorage, proxyMux)
@@ -312,7 +312,7 @@ func TestSignXRPLCosignerValidationThreshold(t *testing.T) {
 	cos1Priv, _ := crypto.GenerateKey()
 	cos2Priv, _ := crypto.GenerateKey()
 	cos3Priv, _ := crypto.GenerateKey()
-	wal := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPAlgo, []common.Address{crypto.PubkeyToAddress(cos1Priv.PublicKey), crypto.PubkeyToAddress(cos2Priv.PublicKey), crypto.PubkeyToAddress(cos3Priv.PublicKey)}, 2)
+	wal := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPSignAlgo, []common.Address{crypto.PubkeyToAddress(cos1Priv.PublicKey), crypto.PubkeyToAddress(cos2Priv.PublicKey), crypto.PubkeyToAddress(cos3Priv.PublicKey)}, 2)
 
 	// Instruction with only 1 cosigner -> should fail
 	instr := setup.buildPaymentInstruction(t, []payment.TeeIdKeyIdPair{{TeeId: setup.teeID, KeyId: 1}}, wal.Cosigners[:1], 1, nil)
@@ -362,7 +362,7 @@ func TestSignXRPLInvalidKeyTypeAlgoRejection(t *testing.T) {
 	setup := setupSignXRPLTest(t)
 
 	// EVM type with XRP algo -> should fail on key type
-	setup.createWallet(t, 1, wallets.EVMType, wallets.XRPAlgo, []common.Address{}, 0)
+	setup.createWallet(t, 1, wallets.EVMType, wallets.XRPSignAlgo, []common.Address{}, 0)
 	instr := setup.buildPaymentInstruction(t, []payment.TeeIdKeyIdPair{{TeeId: setup.teeID, KeyId: 1}}, nil, 0, nil)
 	_, _, err := setup.processor.SignXRPLPayment(types.Threshold, instr, nil, nil, nil)
 	require.Error(t, err)
@@ -370,7 +370,7 @@ func TestSignXRPLInvalidKeyTypeAlgoRejection(t *testing.T) {
 
 	// XRP type with EVM algo -> should fail on signing algo
 	setup = setupSignXRPLTest(t)
-	setup.createWallet(t, 2, wallets.XRPType, wallets.EVMAlgo, []common.Address{}, 0)
+	setup.createWallet(t, 2, wallets.XRPType, wallets.EVMSignAlgo, []common.Address{}, 0)
 	instr2 := setup.buildPaymentInstruction(t, []payment.TeeIdKeyIdPair{{TeeId: setup.teeID, KeyId: 2}}, nil, 0, nil)
 	_, _, err = setup.processor.SignXRPLPayment(types.Threshold, instr2, nil, nil, nil)
 	require.Error(t, err)
@@ -391,7 +391,7 @@ func TestSignXRPLWalletNotFound(t *testing.T) {
 func TestSignXRPLTeeIDMismatchNoKeysForSigning(t *testing.T) {
 	setup := setupSignXRPLTest(t)
 
-	setup.createWallet(t, 1, wallets.XRPType, wallets.XRPAlgo, []common.Address{}, 0)
+	setup.createWallet(t, 1, wallets.XRPType, wallets.XRPSignAlgo, []common.Address{}, 0)
 	otherTEE := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	instr := setup.buildPaymentInstruction(t, []payment.TeeIdKeyIdPair{{TeeId: otherTEE, KeyId: 1}}, nil, 0, nil)
 
@@ -403,7 +403,7 @@ func TestSignXRPLTeeIDMismatchNoKeysForSigning(t *testing.T) {
 // Invalid XRP Payment Parameters (hits xrpl.CheckNativePayment error)
 func TestSignXRPLInvalidXRPParameters(t *testing.T) {
 	setup := setupSignXRPLTest(t)
-	setup.createWallet(t, 1, wallets.XRPType, wallets.XRPAlgo, []common.Address{}, 0)
+	setup.createWallet(t, 1, wallets.XRPType, wallets.XRPSignAlgo, []common.Address{}, 0)
 
 	instr := setup.buildPaymentInstruction(t, []payment.TeeIdKeyIdPair{{TeeId: setup.teeID, KeyId: 1}}, nil, 0, nil)
 
@@ -429,7 +429,7 @@ func TestSignXRPLInvalidXRPParameters(t *testing.T) {
 // by a final result after the scheduled delay.
 func TestSignXRPLMultiEntryScheduleWithDelay(t *testing.T) {
 	setup := setupSignXRPLTest(t)
-	wal := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPAlgo, []common.Address{}, 0)
+	wal := setup.createWallet(t, 1, wallets.XRPType, wallets.XRPSignAlgo, []common.Address{}, 0)
 
 	proxyMux, responses := startMockResultServer(t)
 	proc := signutils.NewProcessor(setup.testNode, setup.wStorage, proxyMux)
@@ -486,7 +486,7 @@ func TestSignXRPLInvalidPrivateKey(t *testing.T) {
 		KeyID:              1,
 		PrivateKey:         []byte{0x01, 0x02, 0x03}, // Invalid private key (too short)
 		KeyType:            wallets.XRPType,
-		SigningAlgo:        wallets.XRPAlgo,
+		SigningAlgo:        wallets.XRPSignAlgo,
 		Restored:           false,
 		AdminPublicKeys:    []*ecdsa.PublicKey{},
 		AdminsThreshold:    0,

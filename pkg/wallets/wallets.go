@@ -16,9 +16,10 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/utils"
 )
 
-var EVMAlgo = utils.ToHash("keccak256-secp256k1-ecdsa")
-var XRPAlgo = utils.ToHash("sha512half-secp256k1-ecdsa")
-var SigningAlgos = []common.Hash{EVMAlgo, XRPAlgo}
+var EVMSignAlgo = utils.ToHash("keccak256-secp256k1-ecdsa")
+var VRFAlgo = utils.ToHash("keccak256-secp256k1-vrf")
+var XRPSignAlgo = utils.ToHash("sha512half-secp256k1-ecdsa")
+var Algos = []common.Hash{EVMSignAlgo, XRPSignAlgo, VRFAlgo}
 var XRPType = utils.ToHash("XRP")
 var EVMType = utils.ToHash("EVM")
 
@@ -56,7 +57,7 @@ func CheckKeyGenerate(newWalletRequest wallet.ITeeWalletKeyManagerKeyGenerate, t
 		return errors.New("cosigners threshold cannot be greater than the number of cosigners")
 	}
 
-	if !slices.Contains(SigningAlgos, newWalletRequest.SigningAlgo) {
+	if !slices.Contains(Algos, newWalletRequest.SigningAlgo) {
 		return errors.New("signing algorithm not supported")
 	}
 

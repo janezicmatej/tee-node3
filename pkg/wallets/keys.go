@@ -140,10 +140,10 @@ func (w *Wallet) KeyExistenceProof(teeID common.Address) *wallet.ITeeWalletKeyMa
 // Sign returns a cryptographic signature of the message using the wallet's signing algorithm.
 func (w *Wallet) Sign(msg []byte) ([]byte, error) {
 	switch w.SigningAlgo {
-	case XRPAlgo:
+	case XRPSignAlgo:
 		prv := ToECDSAUnsafe(w.PrivateKey)
 		return signSHA512HalfSecp256k1ECDSA(prv, msg)
-	case EVMAlgo:
+	case EVMSignAlgo:
 		prv := ToECDSAUnsafe(w.PrivateKey)
 		return signKeccak256Secp256k1ECDSA(prv, msg)
 	default:
@@ -154,7 +154,7 @@ func (w *Wallet) Sign(msg []byte) ([]byte, error) {
 // Decrypt decrypts an encrypted message using the supplied private key based on type of key.
 func (w *Wallet) Decrypt(cipher []byte) ([]byte, error) {
 	switch w.SigningAlgo {
-	case XRPAlgo, EVMAlgo:
+	case XRPSignAlgo, EVMSignAlgo:
 		prv := ToECDSAUnsafe(w.PrivateKey)
 		prvDecryption, err := utils.ECDSAPrivKeyToECIES(prv)
 		if err != nil {
@@ -174,7 +174,7 @@ func (w *Wallet) Decrypt(cipher []byte) ([]byte, error) {
 
 func (w *Wallet) pubKey() []byte {
 	switch w.SigningAlgo {
-	case XRPAlgo, EVMAlgo:
+	case XRPSignAlgo, EVMSignAlgo, VRFAlgo:
 		prv := ToECDSAUnsafe(w.PrivateKey)
 		return types.PubKeyToBytes(&prv.PublicKey)
 	default:
@@ -185,7 +185,7 @@ func (w *Wallet) pubKey() []byte {
 // GenerateKey creates a new private key for the signing algorithm.
 func GenerateKey(signingAlgo common.Hash) ([]byte, error) {
 	switch signingAlgo {
-	case XRPAlgo, EVMAlgo:
+	case XRPSignAlgo, EVMSignAlgo, VRFAlgo:
 		sk, err := crypto.GenerateKey()
 		if err != nil {
 			return nil, err

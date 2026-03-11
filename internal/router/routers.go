@@ -9,6 +9,7 @@ import (
 	"github.com/flare-foundation/tee-node/internal/processors/instructions/ftdcutils"
 	"github.com/flare-foundation/tee-node/internal/processors/instructions/regutils"
 	"github.com/flare-foundation/tee-node/internal/processors/instructions/signutils"
+	"github.com/flare-foundation/tee-node/internal/processors/instructions/vrfutils"
 	"github.com/flare-foundation/tee-node/internal/processors/instructions/walletutils"
 	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/pkg/policy"
@@ -46,6 +47,9 @@ func NewPMWRouter(teeNode *pnode.Node, wStorage *wallets.Storage, pStorage *poli
 	sp := signutils.NewProcessor(teeNode, wStorage, proxyURL)
 	r.RegisterInstructionProcessor(op.XRP, op.Pay, instructions.NewProcessor(sp.SignXRPLPayment, teeNode, pStorage, false))
 	r.RegisterInstructionProcessor(op.XRP, op.Reissue, instructions.NewProcessor(sp.SignXRPLPayment, teeNode, pStorage, false))
+
+	vp := vrfutils.NewProcessor(teeNode, wStorage)
+	r.RegisterInstructionProcessor(op.Wallet, op.VRF, instructions.NewProcessor(vp.ProveRandomness, teeNode, pStorage, true))
 
 	return r
 }
