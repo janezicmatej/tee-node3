@@ -122,6 +122,10 @@ func weightsNormalization(weights []uint16, total uint16) ([]uint16, error) {
 	normalizedWeights := make([]uint16, len(weights))
 
 	for i, weight := range weights {
+		if sum == 0 {
+			// in case the last few weights are zero, we just let the rest of normalized weights be zero to avoid division by zero
+			break
+		}
 		normalizedWeight := uint16((uint64(weight) * uint64(total) / uint64(sum)))
 		sum -= weight
 		total -= normalizedWeight
