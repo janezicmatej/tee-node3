@@ -1,0 +1,11 @@
+# ignore everything
+*
+
+# include source and build files
+!go.mod
+!go.sum
+!assets/
+!cmd/
+!internal/
+!pkg/
+!snap_sources_list.sh

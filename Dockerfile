@@ -1,5 +1,5 @@
 # Build stage  
-FROM golang:1.25.1-alpine AS builder  
+FROM golang:1.25.1-alpine@sha256:b6ed3fd0452c0e9bcdef5597f29cc1418f61672e9d3a2f55bf02e7222c014abd AS builder
 
 ARG SOURCE_DATE_EPOCH
 ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
@@ -10,22 +10,26 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Set working directory  
 WORKDIR /app  
 
-# Copy go mod and sum files  
-COPY go.mod go.sum ./  
+# Copy go mod and sum files
+COPY --chmod=644 go.mod go.sum ./
 
-# Download dependencies  
-RUN go mod download  
+# Download dependencies
+RUN go mod download
 
-# Copy the source code  
-COPY . .  
+# Copy the source code
+COPY --chmod=644 . .
+
+# normalize timestamps so COPY --from=builder is deterministic
+# NOTE:(@janezicmatej) rewrite-timestamp only clamps down (moby/buildkit#3180)
+RUN find /app -exec touch -h -d @${SOURCE_DATE_EPOCH} {} +
 
 # Build the application  
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-buildid= -s -w" -o /app/server cmd/main.go
 
 # ------------------------------------------------------------------------
 
 # Final stage  
-FROM alpine:latest
+FROM alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
 
 ARG SOURCE_DATE_EPOCH
 ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH
