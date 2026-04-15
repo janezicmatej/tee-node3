@@ -8,4 +8,4 @@
 !cmd/
 !internal/
 !pkg/
-!snap_sources_list.sh
+!repro-sources-list.sh
