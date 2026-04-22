@@ -63,6 +63,9 @@ func SignatureToSignersAddress(hash, signature []byte) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
+	if pubKey == nil {
+		return common.Address{}, errors.New("failed to recover public key from signature")
+	}
 	address := crypto.PubkeyToAddress(*pubKey)
 
 	return address, nil
@@ -116,4 +119,16 @@ func ECDSAPrivKeyToECIES(privKey *ecdsa.PrivateKey) (*ecies.PrivateKey, error) {
 	}
 
 	return &ecies.PrivateKey{PublicKey: *pubKey, D: privKey.D}, nil
+}
+
+// HasDuplicateAddresses reports whether addrs contains any address more than once.
+func HasDuplicateAddresses(addrs []common.Address) bool {
+	seen := make(map[common.Address]struct{}, len(addrs))
+	for _, a := range addrs {
+		if _, ok := seen[a]; ok {
+			return true
+		}
+		seen[a] = struct{}{}
+	}
+	return false
 }

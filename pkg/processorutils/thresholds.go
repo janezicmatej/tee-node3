@@ -11,6 +11,7 @@ import (
 
 	"github.com/flare-foundation/tee-node/pkg/fdc"
 	"github.com/flare-foundation/tee-node/pkg/policy"
+	"github.com/flare-foundation/tee-node/pkg/utils"
 )
 
 const maxBIPS = 10000
@@ -19,6 +20,10 @@ const fdcMinimumThresholdBIPS = 4000
 
 // CheckThresholds checks that data provider threshold and cosigner threshold are reached.
 func CheckThresholds(data *instruction.DataFixed, signers []common.Address, sPolicy *cpolicy.SigningPolicy) error {
+	if utils.HasDuplicateAddresses(data.Cosigners) {
+		return errors.New("cosigner list contains duplicate addresses")
+	}
+
 	err := checkCosigners(signers, data.Cosigners, data.CosignersThreshold)
 	if err != nil {
 		return err

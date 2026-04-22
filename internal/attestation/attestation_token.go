@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/flare-foundation/tee-node/internal/settings"
 	"github.com/flare-foundation/tee-node/pkg/attestation"
@@ -20,6 +21,7 @@ func GetGoogleAttestationToken(nonces []string, tokenType attestation.TokenType)
 		return []byte(attestation.MagicPass), nil
 	}
 	httpClient := http.Client{
+		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
 			// Set the DialContext field to a function that creates
 			// a new network connection to a Unix domain socket

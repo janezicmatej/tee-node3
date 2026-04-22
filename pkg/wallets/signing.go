@@ -58,6 +58,9 @@ func verifySHA512HalfSecp256k1ECDSA(msg, signature, publicKey []byte) error {
 	if err != nil {
 		return err
 	}
+	if recovered == nil {
+		return errors.New("signature verification failed: could not recover public key")
+	}
 	if crypto.PubkeyToAddress(*recovered) != crypto.PubkeyToAddress(*pk) {
 		return errors.New("signature verification failed: signer mismatch")
 	}
@@ -73,6 +76,9 @@ func verifyKeccak256Secp256k1ECDSA(msg, signature, publicKey []byte) error {
 	recovered, err := crypto.SigToPub(msgHash, signature)
 	if err != nil {
 		return err
+	}
+	if recovered == nil {
+		return errors.New("signature verification failed: could not recover public key")
 	}
 	if crypto.PubkeyToAddress(*recovered) != crypto.PubkeyToAddress(*pk) {
 		return errors.New("signature verification failed: signer mismatch")

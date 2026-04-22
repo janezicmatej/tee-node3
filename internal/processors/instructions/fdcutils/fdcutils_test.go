@@ -415,6 +415,40 @@ func TestFDCProveSignatureEdgeCases(t *testing.T) {
 	require.Contains(t, res.Log, "double signing")
 }
 
+// Verifies the encoded DataProviderSignatures blob: after a successful Prove,
+// the blob parses correctly, signatures are strictly ordered by voter index,
+// and each one recovers to the expected voter address.
+func TestFDCProveEncodedDataProviderSignatures(t *testing.T) {
+	setup := setupFDCProveTest(t)
+
+	// DP threshold 60% with 1-of-10 cosigners keeps the "one threshold > 50%" rule satisfied.
+	request := setup.buildFDCRequest(utils.ToHash("PMWMultisigAccountConfigured"), utils.ToHash("XRP"), 6000, setup.defaultRequestBody)
+	instr := setup.buildInstruction(t, request, setup.defaultResponseBody, setup.cosigners[:2], 1, setup.defaultTimestamp)
+
+	msgHash, _, _, _, err := fdc.HashMessage(request, setup.defaultResponseBody, setup.cosigners[:2], 1, setup.defaultTimestamp)
+	require.NoError(t, err)
+
+	// Sign with a non-sorted subset of providers to exercise the sort inside
+	// checkResponseSignatures through the final wire blob.
+	order := []int{10, 2, 25, 7, 0, 18, 3, 50, 77, 99}
+	sigs := make([]hexutil.Bytes, 0, len(order))
+	signers := make([]common.Address, 0, len(order))
+	for _, i := range order {
+		sig, sigErr := utils.Sign(msgHash[:], setup.privKeys[i])
+		require.NoError(t, sigErr)
+		sigs = append(sigs, sig)
+		signers = append(signers, setup.signers[i])
+	}
+
+	proveResponse, err := setup.executeAndDecodeProve(t, instr, sigs, signers)
+	require.NoError(t, err)
+	require.NotNil(t, proveResponse)
+
+	testutils.VerifyEncodedDataProviderSignatures(
+		t, proveResponse.DataProviderSignatures, msgHash, setup.signers, len(order),
+	)
+}
+
 // Ensure data provider signatures are sorted by voter index in checkResponseSignatures
 func TestFDCProveDataProviderSignaturesAreSorted(t *testing.T) {
 	setup := setupFDCProveTest(t)

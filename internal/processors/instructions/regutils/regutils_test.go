@@ -88,7 +88,7 @@ func TestProcessorTEEAttestationThreshold(t *testing.T) {
 	require.Equal(t, activeHash, response.TeeInfo.LastSigningPolicyHash)
 
 	require.NotZero(t, response.TeeInfo.TeeTimestamp)
-	require.Equal(t, []byte(attestation.MagicPass), []byte(response.Attestation))
+	require.Equal(t, attestation.MagicPass, response.Attestation)
 }
 
 func TestProcessorTEEAttestationEnd(t *testing.T) {

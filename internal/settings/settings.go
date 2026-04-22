@@ -38,11 +38,17 @@ var QueuedActionsSleepTime = 100 * time.Millisecond
 
 const ProxyTimeout = 2 * time.Second
 
+// ActionProcessTimeout bounds the synchronous per-action processing time.
+// If exceeded, the queue worker abandons the in-flight processor goroutine
+// and returns an error result, keeping the queue responsive.
+const ActionProcessTimeout = 10 * time.Second
+
 const (
 	MaxInstructionSize     = 100 * 1024       // 100 KB
 	MaxActionSize          = 10 * 1024 * 1024 // 10 MB
 	MaxFetchResponseSize   = 10 * 1024 * 1024 // 10 MB - limits the total size of a fetched action response
 	MaxVariableMessageSize = 1024 * 1024      // 1 MB - limits the total size of all aggregated variable messages
+	MaxVariableMessages    = 200              // Maximum number of per-signer variable messages (and signatures/timestamps) in an action. Bounds per-entry work like decrypt on restore.
 
 	MaxWallets                = 200_000          // Maximum number of wallets that can be stored in memory. This is a safety limit to prevent OOM errors.
 	MaxPermanentWalletsStatus = 1_000_000        // Maximum number of wallets that can be stored in permanent storage. This is a safety limit to prevent OOM errors.

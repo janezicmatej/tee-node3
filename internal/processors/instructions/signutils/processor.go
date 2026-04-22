@@ -113,7 +113,12 @@ func (p *Processor) SignXRPLPayment(
 		p.activeRoutines.Add(1)
 
 		go func() {
-			defer p.activeRoutines.Add(-1)
+			defer func() {
+				if rec := recover(); rec != nil {
+					logger.Errorf("sign schedule goroutine panic: %v", rec)
+				}
+				p.activeRoutines.Add(-1)
+			}()
 			startTime := time.Now()
 			for i, entry := range entries {
 				time.Sleep(time.Until(startTime.Add(entry.Delay)))
