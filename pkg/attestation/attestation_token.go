@@ -34,7 +34,7 @@ func (c *NeededClaims) Platform() (common.Hash, error) {
 }
 
 func (c *NeededClaims) CodeHash() (common.Hash, error) {
-	ch, err := convert.Hex32StringToCommonHash(strings.TrimPrefix(c.SubMods.Container.ImageDigest, "sha256:"))
+	ch, err := convert.Hex32StringToCommonHash(strings.TrimPrefix(c.SubMods.Container.ImageID, "sha256:"))
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("unparsable ImageDigest: %w", err)
 	}
@@ -47,5 +47,5 @@ type SubMods struct {
 }
 
 type Container struct {
-	ImageDigest string `json:"image_digest"`
+	ImageID string `json:"image_id"`
 }

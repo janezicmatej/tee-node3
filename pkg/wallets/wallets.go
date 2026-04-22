@@ -57,6 +57,10 @@ func CheckKeyGenerate(newWalletRequest wallet.ITeeWalletKeyManagerKeyGenerate, t
 		return errors.New("cosigners threshold cannot be greater than the number of cosigners")
 	}
 
+	if utils.HasDuplicateAddresses(newWalletRequest.ConfigConstants.Cosigners) {
+		return errors.New("cosigner list contains duplicate addresses")
+	}
+
 	if !slices.Contains(Algos, newWalletRequest.SigningAlgo) {
 		return errors.New("signing algorithm not supported")
 	}

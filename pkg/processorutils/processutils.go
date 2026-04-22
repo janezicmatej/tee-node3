@@ -74,6 +74,13 @@ func DeadlineExceeded(a *types.Action, err error) types.ActionResult {
 
 // CheckAndAdapt normalizes variable messages and validates associated arrays.
 func CheckAndAdapt(a *types.Action) error {
+	if len(a.Signatures) > settings.MaxVariableMessages ||
+		len(a.Timestamps) > settings.MaxVariableMessages ||
+		len(a.AdditionalVariableMessages) > settings.MaxVariableMessages {
+		return fmt.Errorf("per-signer entry count exceeds limit of %d (signatures=%d, timestamps=%d, messages=%d)",
+			settings.MaxVariableMessages, len(a.Signatures), len(a.Timestamps), len(a.AdditionalVariableMessages))
+	}
+
 	if len(a.AdditionalVariableMessages) == 0 {
 		a.AdditionalVariableMessages = make([]hexutil.Bytes, len(a.Signatures))
 	}

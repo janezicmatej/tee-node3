@@ -233,3 +233,57 @@ func encodeSigningPolicy(policy *relay.RelaySigningPolicyInitialized) ([]byte, e
 
 	return result, nil
 }
+
+// VerifyEncodedDataProviderSignatures parses the wire blob emitted by
+// prepareFinalizationTxInput in the FDC2 PROVE processor and asserts:
+//   - the blob's length is consistent with its declared signing-policy voter
+//     count and signature count,
+//   - signatures are strictly ordered by voter index,
+//   - every signature recovers (over msgHash) to voterAddresses[index].
+//
+// Blob layout:
+//
+//	[4]byte relay selector || signingPolicyBytes || msgPrepended(38) ||
+//	[2]byte sigCount || { [65]byte V||R||S , [2]byte voterIndex }*
+//
+// signingPolicyBytes begins with 2 bytes numVoters and is 43 + numVoters*22
+// total, per encodeSigningPolicy.
+func VerifyEncodedDataProviderSignatures(
+	t *testing.T,
+	blob []byte,
+	msgHash common.Hash,
+	voterAddresses []common.Address,
+	expectedCount int,
+) {
+	t.Helper()
+
+	off := 4 // relay function selector
+	require.GreaterOrEqual(t, len(blob), off+2, "blob too short for signing policy header")
+	numVoters := int(blob[off])<<8 | int(blob[off+1])
+	off += 43 + numVoters*22 // signing policy bytes
+	off += 38                // msgPrepended: 1 + 4 + 1 + 32
+
+	require.GreaterOrEqual(t, len(blob), off+2, "blob too short for signature count")
+	dpCount := int(blob[off])<<8 | int(blob[off+1])
+	off += 2
+	require.Equal(t, off+dpCount*(65+2), len(blob), "DP signatures blob size mismatch")
+	require.Equal(t, expectedCount, dpCount, "unexpected data-provider signature count")
+
+	prevIndex := -1
+	for i := range dpCount {
+		base := off + i*(65+2)
+		vrs := blob[base : base+65]
+		idx := int(blob[base+65])<<8 | int(blob[base+66])
+		require.Less(t, prevIndex, idx, "DP signatures must be strictly ordered by voter index")
+		require.Less(t, idx, len(voterAddresses))
+
+		// EncodeSignatures stores [V||R||S]; VerifySignature expects [R||S||V-27].
+		rsv := make([]byte, 65)
+		copy(rsv, vrs[1:33])
+		copy(rsv[32:], vrs[33:65])
+		rsv[64] = vrs[0] - 27
+		err := utils.VerifySignature(msgHash.Bytes(), rsv, voterAddresses[idx])
+		require.NoError(t, err, "DP signature %d (voter index %d) failed verification", i, idx)
+		prevIndex = idx
+	}
+}

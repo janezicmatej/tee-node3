@@ -116,6 +116,9 @@ func (p *Processor) KeyDelete(
 	if err != nil {
 		return nil, nil, err
 	}
+	if !req.Nonce.IsUint64() {
+		return nil, nil, errors.New("nonce too large")
+	}
 
 	p.wStorage.Lock()
 	defer p.wStorage.Unlock()

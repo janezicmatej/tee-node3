@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -80,7 +79,7 @@ func (s *SignServer) Close(ctx context.Context) error {
 
 func (s *SignServer) registerRoutes() {
 	mux := http.NewServeMux()
-	s.server.Handler = addContentType(mux, "application/json")
+	s.server.Handler = recoverPanic(addContentType(mux, "application/json"))
 
 	mux.HandleFunc(fmt.Sprintf("GET /key-info/{%s}/{%s}", walletID, keyID), s.getKeyInfoHandler)
 	mux.HandleFunc(fmt.Sprintf("POST /sign/{%s}/{%s}", walletID, keyID), s.signWithKeyHandler)
@@ -106,12 +105,11 @@ func (s *SignServer) getKeyInfoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.wStorage.RLock()
-	defer s.wStorage.RUnlock()
-
 	wallet, err := s.wStorage.Get(wallets.KeyIDPair{
 		WalletID: wID,
 		KeyID:    kID,
 	})
+	s.wStorage.RUnlock()
 	if err != nil {
 		if errors.Is(err, wallets.ErrWalletNonExistent) {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -160,9 +158,8 @@ func (s *SignServer) signWithKeyHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	s.wStorage.RLock()
-	defer s.wStorage.RUnlock()
-
 	wallet, err := s.wStorage.Get(wallets.KeyIDPair{WalletID: wID, KeyID: kID})
+	s.wStorage.RUnlock()
 	if err != nil {
 		if errors.Is(err, wallets.ErrWalletNonExistent) {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -239,11 +236,6 @@ func (s *SignServer) postResultHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := router.SignResult(&result, s.node)
-	if err != nil {
-		http.Error(w, "can not sign", http.StatusInternalServerError)
-	}
-
 	s.proxyURL.RLock()
 	url := s.proxyURL.URL
 	s.proxyURL.RUnlock()
@@ -253,22 +245,32 @@ func (s *SignServer) postResultHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var postErr error
-	deadline := time.Now().Add(100 * time.Millisecond)
-	for {
-		postErr = queue.PostActionResponse(fmt.Sprintf("%s/result", url), response)
-		if postErr == nil {
-			break
+	response, err := router.SignResult(&result, s.node)
+	if err != nil {
+		http.Error(w, "can not sign", http.StatusInternalServerError)
+	}
+
+	postURL := fmt.Sprintf("%s/result", url)
+	postErr := queue.PostActionResponse(postURL, response)
+	if postErr != nil {
+		logger.Errorf("/result: error posting result: %v", postErr)
+
+		// Retry with a minimal unsigned error-only result.
+		fallback := types.ActionResult{
+			Status:  0,
+			Version: settings.EncodingVersion,
+			Log:     fmt.Sprintf("error posting result: %v", postErr),
 		}
-		if time.Now().After(deadline) {
-			http.Error(w, postErr.Error(), http.StatusInternalServerError)
-			return
+		fallbackResp := &types.ActionResponse{Result: fallback}
+		if retryErr := queue.PostActionResponse(postURL, fallbackResp); retryErr != nil {
+			logger.Errorf("/result: error posting fallback result: %v", retryErr)
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Return success response with empty body
-	w.WriteHeader(http.StatusOK)
+	if err == nil && postErr == nil {
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 // decryptWithKeyHandler handles POST /decrypt/{walletD}/{keyID}.
@@ -300,9 +302,8 @@ func (s *SignServer) decryptWithKeyHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	s.wStorage.RLock()
-	defer s.wStorage.RUnlock()
-
 	wallet, err := s.wStorage.Get(wallets.KeyIDPair{WalletID: wID, KeyID: kID})
+	s.wStorage.RUnlock()
 	if err != nil {
 		if errors.Is(err, wallets.ErrWalletNonExistent) {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -413,6 +414,21 @@ func invalidParam(param string) error {
 func addContentType(h http.Handler, contentType string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", contentType)
+		h.ServeHTTP(w, r)
+	})
+}
+
+// recoverPanic catches panics in downstream handlers, logs them, and returns a
+// 500 to the caller. Without this, a panic in any handler goroutine crashes
+// the entire tee-node process.
+func recoverPanic(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				logger.Errorf("handler panic on %s %s: %v", r.Method, r.URL.Path, rec)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
+		}()
 		h.ServeHTTP(w, r)
 	})
 }

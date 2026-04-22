@@ -2,6 +2,7 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -98,7 +99,7 @@ func (r *Router) serveQueueIteration(id processorutils.QueueID, signer node.Sign
 	}
 	logger.Infof("%s queue: fetched an action: id %v, type %v, submission tag %v", id, action.Data.ID, action.Data.Type, action.Data.SubmissionTag)
 
-	result := r.process(action, id)
+	result := r.processWithTimeout(action, id)
 	if result.Status == 0 {
 		logger.Errorf("%s queue: processing action %v error: %v", id, action.Data.ID, result.Log)
 	} else {
@@ -201,6 +202,34 @@ func (r *Router) RegisterDefaultInstruction(processor Processor) {
 	}
 
 	r.defaultInstruction = processor
+}
+
+// processWithTimeout runs r.process under a context-bounded deadline. If the
+// processor exceeds settings.ActionProcessTimeout the worker returns an error
+// result so the queue keeps moving; the in-flight processor goroutine is left
+// to finish on its own and its result (if any) is discarded.
+func (r *Router) processWithTimeout(a *types.Action, queueID processorutils.QueueID) types.ActionResult {
+	ctx, cancel := context.WithTimeout(context.Background(), settings.ActionProcessTimeout)
+	defer cancel()
+
+	resultCh := make(chan types.ActionResult, 1)
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				logger.Errorf("%s queue: recovered from panic during processing: %v", queueID, rec)
+				resultCh <- r.errorResult(a, fmt.Sprintf("internal error: panic: %v", rec))
+			}
+		}()
+		resultCh <- r.process(a, queueID)
+	}()
+
+	select {
+	case result := <-resultCh:
+		return result
+	case <-ctx.Done():
+		logger.Errorf("%s queue: processing timeout of %v exceeded for action %v", queueID, settings.ActionProcessTimeout, a.Data.ID)
+		return r.errorResult(a, fmt.Sprintf("processing timeout of %v exceeded", settings.ActionProcessTimeout))
+	}
 }
 
 func (r *Router) process(a *types.Action, queueID processorutils.QueueID) types.ActionResult {

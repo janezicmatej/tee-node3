@@ -72,7 +72,7 @@ func ConstructTEEInfoResponse(challenge common.Hash, nodeInfo *node.Info, initia
 	teeInfoResponse := types.TeeInfoResponse{
 		TeeInfo:     teeInfo,
 		MachineData: mData,
-		Attestation: attestationBytes,
+		Attestation: string(attestationBytes),
 	}
 
 	return &teeInfoResponse, nil

@@ -73,7 +73,7 @@ type TeeInfoResponse struct {
 	TeeInfo       TeeInfo       `json:"teeInfo"`
 	MachineData   MachineData   `json:"machineData"`
 	DataSignature hexutil.Bytes `json:"dataSignature"`
-	Attestation   hexutil.Bytes `json:"attestation"`
+	Attestation   string        `json:"attestation"`
 }
 
 type MachineData struct {

@@ -15,14 +15,20 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	commonpolicy "github.com/flare-foundation/go-flare-common/pkg/policy"
 	"github.com/flare-foundation/go-flare-common/pkg/random"
+	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/op"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/connector"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/payment"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/verification"
 	vrfstruct "github.com/flare-foundation/go-flare-common/pkg/tee/structs/vrf"
+	"github.com/flare-foundation/go-flare-common/pkg/xrpl/signing"
+	"github.com/flare-foundation/go-flare-common/pkg/xrpl/signing/secp256k1"
+	"github.com/flare-foundation/go-flare-common/pkg/xrpl/signing/signer"
 
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs/wallet"
 	"github.com/flare-foundation/tee-node/internal/router"
@@ -39,7 +45,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// todo: add cosigners to commonwallet, check xrp signature, verify signer sequence data (vote hash), verify encoded data provider signatures in FDC2
 func TestProcessorsEndToEnd(t *testing.T) {
 	testNode, pStorage, wStorage := testutils.Setup(t)
 
@@ -72,6 +77,20 @@ func TestProcessorsEndToEnd(t *testing.T) {
 		}
 	}
 
+	// Cosigners for the common (XRP) wallet. One of them overlaps a data
+	// provider, to exercise the provider/cosigner overlap path.
+	numCosigners := 3
+	cosignerPrivKeys := make([]*ecdsa.PrivateKey, numCosigners)
+	cosignerAddresses := make([]common.Address, numCosigners)
+	for i := range numCosigners - 1 {
+		cosignerPrivKeys[i], err = crypto.GenerateKey()
+		require.NoError(t, err)
+		cosignerAddresses[i] = crypto.PubkeyToAddress(cosignerPrivKeys[i].PublicKey)
+	}
+	cosignerPrivKeys[numCosigners-1] = providerPrivKeys[1]
+	cosignerAddresses[numCosigners-1] = crypto.PubkeyToAddress(providerPrivKeys[1].PublicKey)
+	cosignersThreshold := uint64(numCosigners)
+
 	mainActionInfoChan := make(chan *types.Action, 100)
 	readActionInfoChan := make(chan *types.Action, 100)
 	actionResponseChan := make(chan *types.ActionResponse, 100)
@@ -97,16 +116,16 @@ func TestProcessorsEndToEnd(t *testing.T) {
 	var walletID = common.HexToHash("0xabcdef")
 	var keyID = uint64(1)
 	walletProof := generateWallet(t, mainActionInfoChan, actionResponseChan, teeID, walletID, keyID,
-		providerPrivKeys, adminWalletPublicKeys, finalEpochID, wStorage, wallets.XRPType, wallets.XRPSignAlgo)
+		providerPrivKeys, adminWalletPublicKeys, cosignerAddresses, cosignersThreshold, finalEpochID, wStorage, wallets.XRPType, wallets.XRPSignAlgo)
 	require.False(t, walletProof.Restored)
 
 	var vrfWalletID = common.HexToHash("0x123456")
 	var vrfKeyID = uint64(1)
 	randWalletProof := generateWallet(t, mainActionInfoChan, actionResponseChan, teeID, vrfWalletID, vrfKeyID,
-		providerPrivKeys, adminWalletPublicKeys, finalEpochID, wStorage, wallets.EVMType, wallets.VRFAlgo)
+		providerPrivKeys, adminWalletPublicKeys, nil, 0, finalEpochID, wStorage, wallets.EVMType, wallets.VRFAlgo)
 	proveVRFRandomness(t, mainActionInfoChan, actionResponseChan, teeID, vrfWalletID, vrfKeyID, randWalletProof.PublicKey, providerPrivKeys, finalEpochID)
 
-	signTransaction(t, mainActionInfoChan, actionResponseChan, teeID, walletID, keyID, providerPrivKeys, finalEpochID)
+	signTransaction(t, mainActionInfoChan, actionResponseChan, teeID, walletID, keyID, providerPrivKeys, cosignerPrivKeys, cosignerAddresses, cosignersThreshold, finalEpochID, wStorage)
 
 	walletBackup := getBackup(t, readActionInfoChan, actionResponseChan, teeID, walletID, keyID)
 	vrfWalletBackup := getBackup(t, readActionInfoChan, actionResponseChan, teeID, vrfWalletID, vrfKeyID)
@@ -135,7 +154,49 @@ func TestProcessorsEndToEnd(t *testing.T) {
 
 	fdcProve(t, mainActionInfoChan, actionResponseChan, teeID, providerPrivKeys, adminPrivKeys, finalEpochID)
 
-	// todo: update policy
+	updatePolicy(t, mainActionInfoChan, actionResponseChan, providerPrivKeys, providerAddresses, finalEpochID+1)
+}
+
+// updatePolicy builds a new signing policy for the next epoch (same voters as
+// the currently active policy, with a different random seed so a few weights
+// shift) and submits it signed by a super-majority of the current providers.
+func updatePolicy(t *testing.T,
+	actionInfoChan chan *types.Action,
+	actionResponseChan chan *types.ActionResponse,
+	privKeys []*ecdsa.PrivateKey,
+	addresses []common.Address,
+	newEpochID uint32,
+) {
+	t.Helper()
+
+	// "Slightly changed" policy: same voters but fresh seed so weights differ.
+	newPolicy := testutils.GenerateRandomPolicyData(t, newEpochID, addresses, int64(54321))
+
+	// Sign the new policy with every provider from the active policy. The
+	// processor only needs > threshold, so all signing is well over the bar.
+	signed := testutils.BuildMultiSignedPolicy(t, newPolicy.RawBytes(), privKeys)
+
+	pubKeys := make([]types.PublicKey, len(privKeys))
+	for i, voter := range privKeys {
+		pubKeys[i] = types.PubKeyToStruct(&voter.PublicKey)
+	}
+
+	req := &types.UpdatePolicyRequest{
+		NewPolicy:  signed,
+		PublicKeys: pubKeys,
+	}
+
+	action := testutils.BuildMockDirectAction(t, op.Policy, op.UpdatePolicy, req)
+	actionInfoChan <- action
+
+	actionResponse := <-actionResponseChan
+	require.Equal(t, uint8(1), actionResponse.Result.Status, actionResponse.Result.Log)
+
+	// Confirm the new policy is what got installed by hashing a round-trip
+	// through the commonpolicy codec.
+	installed, _, err := commonpolicy.FromRawBytes(newPolicy.RawBytes())
+	require.NoError(t, err)
+	require.Equal(t, newEpochID, installed.RewardEpochID)
 }
 
 func setProxyURL(t *testing.T, proxyPort, setProxyPort int) {
@@ -235,12 +296,18 @@ func generateWallet(
 	keyID uint64,
 	privKeys []*ecdsa.PrivateKey,
 	adminWalletPublicKeys []wallet.PublicKey,
+	cosigners []common.Address,
+	cosignersThreshold uint64,
 	rewardEpochID uint32,
 	wStorage *wallets.Storage,
 	keyType common.Hash,
 	signingAlgo common.Hash,
 ) *wallet.ITeeWalletKeyManagerKeyExistence {
 	t.Helper()
+
+	if cosigners == nil {
+		cosigners = make([]common.Address, 0)
+	}
 
 	originalMessage := wallet.ITeeWalletKeyManagerKeyGenerate{
 		TeeId:       teeID,
@@ -251,8 +318,8 @@ func generateWallet(
 		ConfigConstants: wallet.ITeeWalletKeyManagerKeyConfigConstants{
 			AdminsPublicKeys:   adminWalletPublicKeys,
 			AdminsThreshold:    uint64(len(adminWalletPublicKeys)),
-			Cosigners:          make([]common.Address, 0), // todo: add cosigners
-			CosignersThreshold: 0,
+			Cosigners:          cosigners,
+			CosignersThreshold: cosignersThreshold,
 		},
 	}
 	originalMessageEncoded, err := abi.Arguments{wallet.MessageArguments[op.KeyGenerate]}.Pack(originalMessage)
@@ -378,8 +445,12 @@ func signTransaction(
 	teeID common.Address,
 	walletID [32]byte,
 	keyID uint64,
-	privKeys []*ecdsa.PrivateKey,
+	providerPrivKeys []*ecdsa.PrivateKey,
+	cosignerPrivKeys []*ecdsa.PrivateKey,
+	cosignerAddresses []common.Address,
+	cosignersThreshold uint64,
 	rewardEpochID uint32,
+	wStorage *wallets.Storage,
 ) {
 	t.Helper()
 
@@ -400,8 +471,13 @@ func signTransaction(
 	originalMessageEncoded, err := abi.Arguments{payment.MessageArguments[op.Pay]}.Pack(originalMessage)
 	require.NoError(t, err)
 
+	// The XRP processor enforces CheckMatchingCosigners, so the instruction's
+	// cosigner list / threshold must exactly match the wallet key's. Also sign
+	// with all cosigners so the cosigner threshold is reached.
+	signingKeys := mergePrivKeys(providerPrivKeys, cosignerPrivKeys)
+
 	action := testutils.BuildMockInstructionAction(
-		t, op.XRP, op.Pay, originalMessageEncoded, privKeys, teeID, rewardEpochID, []byte{}, nil, nil, 0, types.Threshold, uint64(time.Now().Unix()),
+		t, op.XRP, op.Pay, originalMessageEncoded, signingKeys, teeID, rewardEpochID, []byte{}, nil, cosignerAddresses, cosignersThreshold, types.Threshold, uint64(time.Now().Unix()),
 	)
 	actionInfoChan <- action
 
@@ -423,9 +499,19 @@ func signTransaction(
 	err = utils.VerifySignature(actionResponse.Result.Hash(), actionResponse.Signature, teeID)
 	require.NoError(t, err)
 
+	// Verify the XRP multisig signatures the TEE produced are cryptographically
+	// valid and that the wallet's address is the one signing.
+	var txs types.XRPSignResponse
+	err = json.Unmarshal(actionResponse.Result.Data, &txs)
+	require.NoError(t, err)
+	require.NotEmpty(t, txs, "expected at least one signed XRP transaction")
+	signedWallet, err := wStorage.Get(wallets.KeyIDPair{WalletID: walletID, KeyID: keyID})
+	require.NoError(t, err)
+	verifyXRPSignatures(t, txs, signedWallet)
+
 	// generate action sent when voting closed
 	action = testutils.BuildMockInstructionAction(
-		t, op.XRP, op.Pay, originalMessageEncoded, privKeys, teeID, rewardEpochID, []byte{}, nil, nil, 0, types.End, uint64(time.Now().Unix()),
+		t, op.XRP, op.Pay, originalMessageEncoded, signingKeys, teeID, rewardEpochID, []byte{}, nil, cosignerAddresses, cosignersThreshold, types.End, uint64(time.Now().Unix()),
 	)
 	actionInfoChan <- action
 
@@ -434,12 +520,112 @@ func signTransaction(
 	err = utils.VerifySignature(actionResponse.Result.Hash(), actionResponse.Signature, teeID)
 	require.NoError(t, err)
 
-	var signerSequence types.RewardingData
-	err = json.Unmarshal(actionResponse.Result.Data, &signerSequence)
+	verifyRewardingData(t, action, actionResponse, teeID)
+}
+
+// mergePrivKeys concatenates the two key slices while skipping any cosigner
+// key whose address already appears in the provider slice, so each signer
+// signs at most once in the action.
+func mergePrivKeys(providers, cosigners []*ecdsa.PrivateKey) []*ecdsa.PrivateKey {
+	seen := make(map[common.Address]bool, len(providers))
+	for _, k := range providers {
+		seen[crypto.PubkeyToAddress(k.PublicKey)] = true
+	}
+	merged := make([]*ecdsa.PrivateKey, 0, len(providers)+len(cosigners))
+	merged = append(merged, providers...)
+	for _, k := range cosigners {
+		if seen[crypto.PubkeyToAddress(k.PublicKey)] {
+			continue
+		}
+		merged = append(merged, k)
+	}
+	return merged
+}
+
+// verifyXRPSignatures asserts every XRPL multisig signature in txs validates
+// and that the wallet's XRPL address appears as a signer in each tx.
+func verifyXRPSignatures(t *testing.T, txs types.XRPSignResponse, w *wallets.Wallet) {
+	t.Helper()
+	expectedAddr := ""
+	if w != nil {
+		expectedAddr = secp256k1WalletAddress(w)
+	}
+	for i, tx := range txs {
+		signersAny, ok := tx["Signers"].([]any)
+		require.True(t, ok, "tx[%d] must have Signers field", i)
+		require.NotEmpty(t, signersAny, "tx[%d] must have at least one signer", i)
+		foundSelf := false
+		for j, sAny := range signersAny {
+			sMap, ok := sAny.(map[string]any)
+			require.True(t, ok, "tx[%d] signer[%d] must be a map", i, j)
+			s, err := signer.Parse(sMap)
+			require.NoError(t, err, "tx[%d] signer[%d] parse", i, j)
+			valid, err := signing.ValidateMultiSig(tx, s)
+			require.NoError(t, err, "tx[%d] signer[%d] validate", i, j)
+			require.True(t, valid, "tx[%d] signer[%d] signature invalid", i, j)
+			if s.Account == expectedAddr {
+				foundSelf = true
+			}
+		}
+		if expectedAddr != "" {
+			require.True(t, foundSelf, "tx[%d]: wallet address %s not present in Signers", i, expectedAddr)
+		}
+	}
+}
+
+// secp256k1WalletAddress returns the XRPL classic address for the given wallet.
+func secp256k1WalletAddress(w *wallets.Wallet) string {
+	prv := wallets.ToECDSAUnsafe(w.PrivateKey)
+	return secp256k1.PrvToAddress(prv)
+}
+
+// verifyRewardingData asserts that the End-phase response carries a well-formed
+// RewardingData: the TEE signature over the voteHash is valid, and the voteHash
+// is exactly the one the node should have produced by iteratively hashing the
+// (signature, variableMessage, timestamp) triples for the instruction.
+func verifyRewardingData(t *testing.T, endAction *types.Action, response *types.ActionResponse, teeID common.Address) {
+	t.Helper()
+
+	var rewardingData types.RewardingData
+	err := json.Unmarshal(response.Result.Data, &rewardingData)
 	require.NoError(t, err)
 
-	err = utils.VerifySignature(signerSequence.VoteSequence.VoteHash[:], signerSequence.Signature, teeID)
+	// TEE signed the voteHash.
+	err = utils.VerifySignature(rewardingData.VoteSequence.VoteHash[:], rewardingData.Signature, teeID)
 	require.NoError(t, err)
+
+	// Recompute the voteHash from the original instruction + signature chain.
+	var instructionDataFixed instruction.DataFixed
+	err = json.Unmarshal(endAction.Data.Message, &instructionDataFixed)
+	require.NoError(t, err)
+
+	instructionHash, err := instructionDataFixed.HashFixed()
+	require.NoError(t, err)
+	require.Equal(t, instructionHash, rewardingData.VoteSequence.InstructionHash)
+
+	expectedVoteHash, err := instructionDataFixed.InitialVoteHash()
+	require.NoError(t, err)
+
+	variableMessages := endAction.AdditionalVariableMessages
+	if len(variableMessages) == 0 {
+		variableMessages = make([]hexutil.Bytes, len(endAction.Signatures))
+	}
+	for i := range endAction.Signatures {
+		expectedVoteHash, err = instruction.NextVoteHash(
+			expectedVoteHash,
+			uint64(i),
+			endAction.Signatures[i],
+			variableMessages[i],
+			endAction.Timestamps[i],
+		)
+		require.NoError(t, err)
+	}
+	require.Equal(t, expectedVoteHash, rewardingData.VoteSequence.VoteHash)
+
+	require.Equal(t, instructionDataFixed.RewardEpochID, rewardingData.VoteSequence.RewardEpochID)
+	require.Equal(t, teeID, rewardingData.VoteSequence.TeeID)
+	require.Len(t, rewardingData.VoteSequence.Signatures, len(endAction.Signatures))
+	require.Len(t, rewardingData.VoteSequence.AdditionalVariableMessageHashes, len(endAction.Signatures))
 }
 
 func deleteWallet(
@@ -848,6 +1034,15 @@ func fdcProve(
 		require.NoError(t, err)
 	}
 	require.Equal(t, fdcResponse.ResponseBody, additionalFixedMessageEncoded)
+
+	// Decode and verify the encoded data-provider signatures blob.
+	providerAddresses := make([]common.Address, len(providerPrivKeys))
+	for i, k := range providerPrivKeys {
+		providerAddresses[i] = crypto.PubkeyToAddress(k.PublicKey)
+	}
+	testutils.VerifyEncodedDataProviderSignatures(
+		t, fdcResponse.DataProviderSignatures, fdcMsgHash, providerAddresses, len(providerPrivKeys),
+	)
 
 	// generate action sent when voting closed
 	action = testutils.BuildMockInstructionAction(
