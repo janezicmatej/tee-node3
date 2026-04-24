@@ -9,8 +9,12 @@ they are built.
 - `SOURCE_DATE_EPOCH` is set to the commit timestamp and passed as a build arg
   to clamp all timestamps
 - Go binary is built with `-trimpath -ldflags="-buildid= -s -w"` and
-  `-buildvcs=false` to strip non-deterministic metadata; `CGO_ENABLED=0`
-  produces a static binary so link-time libc variance cannot leak in
+  `-buildvcs=false` to strip non-deterministic metadata; `CGO_ENABLED=1` with
+  `-linkmode=external -extldflags=-static` plus the `netgo,osusergo` build
+  tags produces a fully static binary that links the native C libsecp256k1
+  from go-ethereum. The cgo toolchain (`gcc`, `libc6-dev`) is installed from
+  the same pinned Debian snapshot as the rest of the packages, so link-time
+  libc variance is eliminated
 - Base image digest is pinned in the Dockerfile
 - Debian package versions are pinned via apt's native snapshot support
   (Debian 13+): `Snapshot: true` in the sources file plus
